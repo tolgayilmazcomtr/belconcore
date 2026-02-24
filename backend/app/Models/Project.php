@@ -20,4 +20,14 @@ class Project extends Model
     {
         return $this->belongsToMany(User::class);
     }
+
+    public function blocks()
+    {
+        return $this->hasMany(Block::class);
+    }
+
+    public function units()
+    {
+        return $this->hasMany(Unit::class);
+    }
 }
