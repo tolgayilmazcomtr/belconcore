@@ -13,20 +13,15 @@ import {
 
 export function Sidebar() {
   return (
-    <aside className="w-64 bg-sidebar border-r border-sidebar-border min-h-screen flex flex-col">
-      <div className="h-16 flex items-center px-6 border-b border-sidebar-border">
-        {/* LOGO */}
-        <Link href="/" className="flex items-center gap-2 font-bold text-2xl tracking-tight">
-          <img src="/logo.png" alt="BelconCORE" className="h-8 w-auto hidden dark:block" />
-          <img src="/logo.png" alt="BelconCORE" className="h-8 w-auto dark:hidden" />
-          <div className="flex">
-            <span className="text-foreground">BELCON</span>
-            <span className="text-primary">CORE</span>
-          </div>
+    <aside className="w-64 bg-[#f8f9fa] border-r border-border min-h-screen flex flex-col">
+      <div className="h-14 flex items-center justify-center px-4 border-b border-border bg-white">
+        {/* LOGO SADECE RESİM */}
+        <Link href="/" className="flex items-center">
+          <img src="/logo.png" alt="BelconCORE" className="h-8 max-w-[150px] object-contain" />
         </Link>
       </div>
 
-      <nav className="flex-1 px-4 py-6 space-y-1 overflow-y-auto">
+      <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
         <SidebarItem icon={<LayoutDashboard size={20} />} label="Dashboard" href="/" />
         <SidebarItem icon={<Building2 size={20} />} label="Projeler" href="/projects" />
         <SidebarItem icon={<Users size={20} />} label="CRM & Satış" href="/crm" />

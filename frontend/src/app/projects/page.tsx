@@ -39,22 +39,22 @@ export default function ProjectsPage() {
     }, [setProjects])
 
     return (
-        <div className="flex-1 space-y-4 p-8 pt-6">
-            <div className="flex items-center justify-between space-y-2">
-                <h2 className="text-3xl font-bold tracking-tight">Projeler</h2>
+        <div className="flex-1 space-y-4 p-4 md:p-6 bg-muted/10 h-full">
+            <div className="flex items-center justify-between bg-white p-3 rounded-md shadow-sm border">
+                <h2 className="text-xl font-bold tracking-tight text-foreground/90">Projeler</h2>
                 <div className="flex items-center space-x-2">
                     <ProjectCreateModal />
                 </div>
             </div>
 
-            <div className="border rounded-md">
+            <div className="bg-white border rounded-md shadow-sm overflow-hidden">
                 <Table>
                     <TableHeader>
                         <TableRow>
-                            <TableHead className="w-[100px]">Proje Kodu</TableHead>
+                            <TableHead className="w-[120px]">Proje Kodu</TableHead>
                             <TableHead>Proje Adı</TableHead>
-                            <TableHead>Durum</TableHead>
-                            <TableHead className="text-right">Bütçe</TableHead>
+                            <TableHead className="w-[120px]">Durum</TableHead>
+                            <TableHead className="text-right w-[150px]">Bütçe</TableHead>
                             <TableHead className="w-[50px]"></TableHead>
                         </TableRow>
                     </TableHeader>

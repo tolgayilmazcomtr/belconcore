@@ -26,8 +26,9 @@ export default function RootLayout({
       <body className={`${inter.className} min-h-screen bg-background font-sans antialiased text-foreground`}>
         <ThemeProvider
           attribute="class"
-          defaultTheme="system"
-          enableSystem
+          defaultTheme="light"
+          forcedTheme="light"
+          enableSystem={false}
           disableTransitionOnChange
         >
           <div className="flex h-screen overflow-hidden">
