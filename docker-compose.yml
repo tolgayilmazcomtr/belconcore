@@ -1,5 +1,9 @@
 version: '3.8'
 
+networks:
+  belcon_network:
+    driver: bridge
+
 services:
   # Laravel Backend Servisi
   backend:
@@ -9,6 +13,8 @@ services:
     restart: unless-stopped
     ports:
       - "8000:8000"
+    networks:
+      - belcon_network
     environment:
       - APP_NAME=BelconCORE
       - APP_ENV=production
@@ -16,12 +22,12 @@ services:
       - APP_DEBUG=false
       - APP_URL=https://api.belcon.com.tr
       - DB_CONNECTION=${DB_CONNECTION:-pgsql}
-      - DB_HOST=${DB_HOST:-postgres}
+      - DB_HOST=${DB_HOST:-belcon-postgres}
       - DB_PORT=${DB_PORT:-5432}
-      - DB_DATABASE=${DB_DATABASE}
-      - DB_USERNAME=${DB_USERNAME}
-      - DB_PASSWORD=${DB_PASSWORD}
-      - REDIS_HOST=${REDIS_HOST:-redis}
+      - DB_DATABASE=${DB_DATABASE:-belconcore}
+      - DB_USERNAME=${DB_USERNAME:-belconcore}
+      - DB_PASSWORD=${DB_PASSWORD:-secret}
+      - REDIS_HOST=${REDIS_HOST:-belcon-redis}
       - CACHE_STORE=${CACHE_STORE:-redis}
       - QUEUE_CONNECTION=${QUEUE_CONNECTION:-redis}
       - SESSION_DRIVER=${SESSION_DRIVER:-redis}
@@ -39,6 +45,8 @@ services:
     restart: unless-stopped
     ports:
       - "3005:3000"
+    networks:
+      - belcon_network
     environment:
       - NEXT_PUBLIC_API_URL=https://api.belcon.com.tr
       - ASSET_PREFIX=https://core.belcon.com.tr
@@ -48,18 +56,24 @@ services:
   # PostgreSQL Veritabanı Servisi
   postgres:
     image: postgres:15-alpine
+    container_name: belcon-postgres
     restart: unless-stopped
+    networks:
+      - belcon_network
     environment:
-      - POSTGRES_DB=${DB_DATABASE}
-      - POSTGRES_USER=${DB_USERNAME}
-      - POSTGRES_PASSWORD=${DB_PASSWORD}
+      - POSTGRES_DB=${DB_DATABASE:-belconcore}
+      - POSTGRES_USER=${DB_USERNAME:-belconcore}
+      - POSTGRES_PASSWORD=${DB_PASSWORD:-secret}
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
   # Redis Servisi
   redis:
     image: redis:7-alpine
+    container_name: belcon-redis
     restart: unless-stopped
+    networks:
+      - belcon_network
     volumes:
       - redis_data:/data
 
