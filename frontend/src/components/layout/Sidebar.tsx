@@ -40,6 +40,7 @@ export function Sidebar() {
       <nav className={`flex-1 overflow-y-auto overflow-x-hidden ${collapsed ? 'px-2 py-4 space-y-2' : 'px-3 py-4 space-y-1'}`}>
         <SidebarItem icon={<LayoutDashboard size={20} className="shrink-0" />} label="Dashboard" href="/" collapsed={collapsed} />
         <SidebarItem icon={<Building2 size={20} className="shrink-0" />} label="Projeler" href="/projects" collapsed={collapsed} />
+        <SidebarItem icon={<Building2 size={20} className="shrink-0" />} label="Bloklar / Binalar" href="/blocks" collapsed={collapsed} />
         <SidebarItem icon={<Users size={20} className="shrink-0" />} label="CRM & Satış" href="/crm" collapsed={collapsed} />
         <SidebarItem icon={<FileText size={20} className="shrink-0" />} label="Teklifler" href="/offers" collapsed={collapsed} />
         <SidebarItem icon={<WalletCards size={20} className="shrink-0" />} label="Ön Muhasebe" href="/accounting" collapsed={collapsed} />
