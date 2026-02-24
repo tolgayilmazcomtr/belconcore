@@ -64,9 +64,9 @@ export function ProjectSelector() {
                 onValueChange={handleValueChange}
                 disabled={projects.length === 0}
             >
-                <SelectTrigger className="w-[200px] h-8 bg-white/10 border-white/20 text-white hover:bg-white/20 transition-colors focus:ring-1 focus:ring-white/30 truncate">
-                    <div className="flex items-center gap-2 truncate">
-                        <Building2 className="h-3.5 w-3.5 opacity-70 shrink-0" />
+                <SelectTrigger className="w-[200px] h-8 bg-white/10 border-white/20 text-white data-[placeholder]:text-white disabled:opacity-90 disabled:bg-black/10 hover:bg-white/20 transition-colors focus:ring-1 focus:ring-white/30 truncate">
+                    <div className="flex items-center gap-2 truncate font-medium">
+                        <Building2 className="h-3.5 w-3.5 opacity-90 shrink-0" />
                         <SelectValue placeholder={projects.length === 0 ? "Proje Bulunamadı" : "Proje Seçin"} />
                     </div>
                 </SelectTrigger>
