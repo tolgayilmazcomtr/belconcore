@@ -14,7 +14,7 @@ services:
       - APP_ENV=production
       - APP_KEY=${APP_KEY}
       - APP_DEBUG=false
-      - APP_URL=https://api.belconcore.com
+      - APP_URL=https://api.belcon.com.tr
       - DB_CONNECTION=pgsql
       - DB_HOST=postgres
       - DB_PORT=5432
@@ -40,7 +40,8 @@ services:
     ports:
       - "3000:3000"
     environment:
-      - NEXT_PUBLIC_API_URL=https://api.belconcore.com
+      - NEXT_PUBLIC_API_URL=https://api.belcon.com.tr
+      - ASSET_PREFIX=https://core.belcon.com.tr
     depends_on:
       - backend
 
