@@ -38,7 +38,7 @@ services:
       dockerfile: Dockerfile
     restart: unless-stopped
     ports:
-      - "3000:3000"
+      - "3005:3000"
     environment:
       - NEXT_PUBLIC_API_URL=https://api.belcon.com.tr
       - ASSET_PREFIX=https://core.belcon.com.tr
