@@ -6,11 +6,11 @@ export function Topbar() {
         <header className="h-[52px] flex items-center justify-between px-4 bg-primary text-white shadow-sm shrink-0">
             <div className="flex items-center gap-4">
                 <div className="flex items-center bg-white/10 rounded px-2.5 py-1.5 w-64 md:w-96 border border-white/20 focus-within:bg-white/20 transition-colors">
-                    <Search size={16} className="text-white/70 mr-2" />
+                    <Search size={16} className="text-white/90 mr-2" />
                     <input
                         type="text"
                         placeholder="Modül veya Müşteri Ara..."
-                        className="bg-transparent border-none outline-none w-full text-[13px] placeholder:text-white/70 text-white"
+                        className="bg-transparent border-none outline-none w-full text-[13px] placeholder:text-white/90 text-white"
                     />
                 </div>
 
