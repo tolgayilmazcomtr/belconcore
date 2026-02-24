@@ -4,14 +4,15 @@ import "./globals.css";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Topbar } from "@/components/layout/Topbar";
 import { Toaster } from "@/components/ui/sonner"
+import { ThemeProvider } from "@/components/theme/ThemeProvider"
 
-const inter = Inter({ subsets: ["latin"] });
+const inter = Inter({ subsets: ["latin", "latin-ext"] });
 
 export const metadata: Metadata = {
   title: "BelconCORE ERP",
-  description: "Belcon İnşaat - Proje Tabanlı ERP Sistemi",
+  description: "Advanced Construction Project Management System",
   icons: {
-    icon: "/favicon.png",
+    icon: "/favicon.png", // Daha önce oluşturduğunuz favicon bu şekilde kullanılır
   },
 };
 
@@ -21,18 +22,26 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="tr">
-      <body className={`${inter.className} antialiased flex h - screen overflow - hidden`}>
-        <Sidebar />
-        <main className="flex-1 flex flex-col h-screen overflow-hidden">
-          <Topbar />
-          <div className="flex-1 overflow-y-auto bg-muted/20 p-6">
-            {children}
+    <html lang="tr" suppressHydrationWarning>
+      <body className={`${inter.className} min-h-screen bg-background font-sans antialiased text-foreground`}>
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="system"
+          enableSystem
+          disableTransitionOnChange
+        >
+          <div className="flex h-screen overflow-hidden">
+            <Sidebar />
+            <div className="flex flex-col flex-1 overflow-hidden">
+              <Topbar />
+              <main className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8">
+                {children}
+              </main>
+            </div>
           </div>
-        </main>
-        <Toaster position="top-right" richColors />
+          <Toaster position="top-right" richColors />
+        </ThemeProvider>
       </body>
     </html>
   );
 }
-
