@@ -56,12 +56,13 @@ export function BlockCreateModal() {
 
         setLoading(true)
         try {
-            // Backend Controller $request->active_project_id üzerinden çalıştığı için payload'a bunu ekliyor varsaydım:
-            // veya Header üzerinden interceptor hallediyordu. Güvence olması için payload'a ekleyelim:
-            const payload = {
-                ...values,
+            const payload: Record<string, any> = {
+                name: values.name,
                 active_project_id: activeProject.id
             };
+
+            if (values.code) payload.code = values.code;
+            if (values.parcel_island) payload.parcel_island = values.parcel_island;
 
             const response = await api.post("/blocks", payload)
 

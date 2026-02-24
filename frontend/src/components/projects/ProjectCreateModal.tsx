@@ -55,10 +55,14 @@ export function ProjectCreateModal() {
     async function onSubmit(values: z.infer<typeof formSchema>) {
         setLoading(true)
         try {
-            const payload = {
-                ...values,
-                planned_budget: values.planned_budget ? parseFloat(values.planned_budget) : null
+            const payload: Record<string, any> = {
+                name: values.name,
             };
+
+            if (values.code) payload.code = values.code;
+            if (values.start_date) payload.start_date = values.start_date;
+            if (values.end_date) payload.end_date = values.end_date;
+            if (values.planned_budget) payload.planned_budget = parseFloat(values.planned_budget);
 
             const response = await api.post("/projects", payload)
 
