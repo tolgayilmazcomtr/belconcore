@@ -73,9 +73,11 @@ export function ProjectCreateModal() {
 
             setOpen(false)
             form.reset()
-        } catch (error: any) {
+        } catch (error) {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const err = error as any;
             toast.error("Hata", {
-                description: error.response?.data?.message || "Proje oluşturulurken bir hata meydana geldi.",
+                description: err.response?.data?.message || "Proje oluşturulurken bir hata meydana geldi.",
             })
         } finally {
             setLoading(false)

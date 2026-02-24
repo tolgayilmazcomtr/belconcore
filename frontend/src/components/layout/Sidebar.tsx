@@ -7,7 +7,6 @@ import {
   Users,
   Building2,
   FileText,
-  Calculator,
   WalletCards,
   Warehouse,
   HardHat,

@@ -12,7 +12,7 @@ import {
     TableRow,
 } from "@/components/ui/table"
 import { Button } from "@/components/ui/button"
-import { PlusCircle, Search, MoreHorizontal } from "lucide-react"
+import { Search, MoreHorizontal } from "lucide-react"
 import { ProjectCreateModal } from "@/components/projects/ProjectCreateModal"
 
 export default function ProjectsPage() {
