@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/table"
 import { Button } from "@/components/ui/button"
 import { PlusCircle, Search, MoreHorizontal } from "lucide-react"
+import { ProjectCreateModal } from "@/components/projects/ProjectCreateModal"
 
 export default function ProjectsPage() {
     const { projects, setProjects } = useAppStore()
@@ -26,7 +27,7 @@ export default function ProjectsPage() {
             try {
                 const response = await api.get('/projects') // Paginator kullanıyorsak `response.data.data` dönecektir
                 // Veritabanı henüz boşsa boş array atıyoruz
-                setProjects(response.data?.data || [])
+                setProjects(response.data?.data || response.data || [])
             } catch (error) {
                 console.error("Projeler yüklenirken hata oluştu:", error)
             } finally {
@@ -42,9 +43,7 @@ export default function ProjectsPage() {
             <div className="flex items-center justify-between space-y-2">
                 <h2 className="text-3xl font-bold tracking-tight">Projeler</h2>
                 <div className="flex items-center space-x-2">
-                    <Button className="bg-primary hover:bg-primary/90">
-                        <PlusCircle className="mr-2 h-4 w-4" /> Yeni Proje
-                    </Button>
+                    <ProjectCreateModal />
                 </div>
             </div>
 
