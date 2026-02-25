@@ -6,7 +6,7 @@ const api = axios.create({
         'Content-Type': 'application/json',
         'Accept': 'application/json',
     },
-    withCredentials: true, // Sanctum cookie bazlı local yetkilendirme için geçerlidir
+    // withCredentials: true, // Sanctum cookie bazlı local yetkilendirme için geçerlidir
 });
 
 // İstek öncesi interceptor
