@@ -3,6 +3,7 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Topbar } from "@/components/layout/Topbar";
+import { AuthGuard } from "@/components/layout/AuthGuard";
 import { Toaster } from "@/components/ui/sonner"
 import { ThemeProvider } from "@/components/theme/ThemeProvider"
 
@@ -31,15 +32,17 @@ export default function RootLayout({
           enableSystem={false}
           disableTransitionOnChange
         >
-          <div className="flex h-screen overflow-hidden">
-            <Sidebar />
-            <div className="flex flex-col flex-1 overflow-hidden">
-              <Topbar />
-              <main className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8">
-                {children}
-              </main>
+          <AuthGuard>
+            <div className="flex h-screen overflow-hidden">
+              <Sidebar />
+              <div className="flex flex-col flex-1 overflow-hidden">
+                <Topbar />
+                <main className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8">
+                  {children}
+                </main>
+              </div>
             </div>
-          </div>
+          </AuthGuard>
           <Toaster position="top-right" richColors />
         </ThemeProvider>
       </body>

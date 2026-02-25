@@ -14,9 +14,15 @@ import {
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
+import { usePathname } from "next/navigation";
 
 export function Sidebar() {
   const [collapsed, setCollapsed] = useState(false);
+  const pathname = usePathname();
+
+  if (pathname === "/login") {
+    return null; // Hide Sidebar on login page
+  }
 
   return (
     <aside className={`${collapsed ? 'w-16' : 'w-64'} bg-[#f8f9fa] border-r border-border min-h-screen flex flex-col transition-all duration-300 relative group`}>
