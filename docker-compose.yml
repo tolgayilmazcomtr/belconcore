@@ -57,7 +57,7 @@ services:
   # PostgreSQL Veritabanı Servisi
   postgres:
     image: postgres:15-alpine
-    container_name: belcon-postgres
+    container_name: belcon-postgres-v2
     restart: unless-stopped
     networks:
       - belcon_network
@@ -66,7 +66,7 @@ services:
       - POSTGRES_USER=${DB_USERNAME:-belconcore}
       - POSTGRES_PASSWORD=${DB_PASSWORD:-secret}
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - postgres_data_v2:/var/lib/postgresql/data
 
   # Redis Servisi
   redis:
@@ -79,6 +79,6 @@ services:
       - redis_data:/data
 
 volumes:
-  postgres_data:
+  postgres_data_v2:
   redis_data:
   storage_data:
