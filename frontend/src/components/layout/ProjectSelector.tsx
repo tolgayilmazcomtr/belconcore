@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { useAppStore } from "@/store/useAppStore"
+import { useProjectStore } from "@/store/useProjectStore"
 import api from "@/lib/api"
 import {
     Select,
@@ -13,7 +13,7 @@ import {
 import { Building2, Loader2 } from "lucide-react"
 
 export function ProjectSelector() {
-    const { projects, setProjects, activeProject, setActiveProject } = useAppStore()
+    const { projects, setProjects, activeProject, setActiveProject } = useProjectStore()
     const [loading, setLoading] = useState(false)
 
     // Bileşen mount olduğunda eğer projeler boşsa çek

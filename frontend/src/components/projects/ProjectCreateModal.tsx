@@ -5,7 +5,7 @@ import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
 import api from "@/lib/api"
-import { useAppStore } from "@/store/useAppStore"
+import { useProjectStore } from "@/store/useProjectStore"
 import { toast } from "sonner"
 
 import {
@@ -39,7 +39,7 @@ const formSchema = z.object({
 export function ProjectCreateModal() {
     const [open, setOpen] = useState(false)
     const [loading, setLoading] = useState(false)
-    const { projects, setProjects } = useAppStore()
+    const { projects, setProjects } = useProjectStore()
 
     const form = useForm<z.infer<typeof formSchema>>({
         resolver: zodResolver(formSchema),
@@ -77,9 +77,8 @@ export function ProjectCreateModal() {
 
             setOpen(false)
             form.reset()
-        } catch (error) {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const err = error as any;
+        } catch (error: unknown) {
+            const err = error as { response?: { data?: { message?: string } } };
             toast.error("Hata", {
                 description: err.response?.data?.message || "Proje oluşturulurken bir hata meydana geldi.",
             })

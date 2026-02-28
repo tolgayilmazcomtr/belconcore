@@ -15,7 +15,13 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
     const [isReady, setIsReady] = useState(false);
 
     useEffect(() => {
+        // Run once on mount to handle hydration
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setIsReady(true);
+    }, []);
+
+    useEffect(() => {
+        if (!isReady) return;
 
         // Check if the route is public
         const isPublicRoute = publicRoutes.includes(pathname);
@@ -27,7 +33,7 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
             // Redirect authenticated user away from login
             router.replace("/");
         }
-    }, [isAuthenticated, pathname, router]);
+    }, [isAuthenticated, pathname, router, isReady]);
 
     // Handle loading state to prevent flash of content
     if (!isReady) {

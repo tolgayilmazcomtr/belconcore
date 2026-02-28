@@ -5,7 +5,7 @@ import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
 import api from "@/lib/api"
-import { useAppStore } from "@/store/useAppStore"
+import { useProjectStore } from "@/store/useProjectStore"
 import { toast } from "sonner"
 
 import {
@@ -37,7 +37,7 @@ const formSchema = z.object({
 export function BlockCreateModal() {
     const [open, setOpen] = useState(false)
     const [loading, setLoading] = useState(false)
-    const { activeProject, blocks, setBlocks } = useAppStore()
+    const { activeProject, blocks, setBlocks } = useProjectStore()
 
     const form = useForm<z.infer<typeof formSchema>>({
         resolver: zodResolver(formSchema),
@@ -56,7 +56,7 @@ export function BlockCreateModal() {
 
         setLoading(true)
         try {
-            const payload: Record<string, any> = {
+            const payload: Record<string, string | number> = {
                 name: values.name,
                 active_project_id: activeProject.id
             };

@@ -31,9 +31,10 @@ export default function LoginPage() {
                 router.push("/");
             }, 100);
 
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error("Giriş hatası:", error);
-            const errMessage = error.response?.data?.message || "Giriş başarısız. Lütfen bilgilerinizi kontrol edin.";
+            const err = error as { response?: { data?: { message?: string } } };
+            const errMessage = err.response?.data?.message || "Giriş başarısız. Lütfen bilgilerinizi kontrol edin.";
             toast.error(errMessage);
         } finally {
             setLoading(false);

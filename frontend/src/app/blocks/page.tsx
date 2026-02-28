@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { useAppStore } from "@/store/useAppStore"
+import { useProjectStore } from "@/store/useProjectStore"
 import api from "@/lib/api"
 import {
     Table,
@@ -16,7 +16,7 @@ import { Search, MoreHorizontal, Building } from "lucide-react"
 import { BlockCreateModal } from "@/components/blocks/BlockCreateModal"
 
 export default function BlocksPage() {
-    const { activeProject, blocks, setBlocks } = useAppStore()
+    const { activeProject, blocks, setBlocks } = useProjectStore()
     const [loading, setLoading] = useState(false)
 
     // API'den Blokları Getir

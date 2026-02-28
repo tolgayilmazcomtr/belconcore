@@ -6,7 +6,7 @@ interface User {
     name: string;
     email: string;
     current_project_id?: number | null;
-    roles?: any[];
+    roles?: { name: string }[];
 }
 
 interface AuthState {
