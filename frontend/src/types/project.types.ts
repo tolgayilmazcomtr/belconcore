@@ -9,6 +9,8 @@ export interface Project {
     status: 'planned' | 'active' | 'completed' | 'on_hold' | 'cancelled';
     created_at?: string;
     updated_at?: string;
+    blocks_count?: number;
+    units_count?: number;
 }
 
 export interface Block {
@@ -19,6 +21,7 @@ export interface Block {
     parcel_island?: string;
     created_at?: string;
     updated_at?: string;
+    units_count?: number;
 }
 
 export interface Unit {

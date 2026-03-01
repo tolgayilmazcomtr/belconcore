@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useMemo } from 'react';
 import { Project } from '@/types/project.types';
 import {
     Table,
@@ -11,6 +11,19 @@ import {
     TableRow,
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { Download, ChevronsUpDown, Search } from 'lucide-react';
+import * as XLSX from 'xlsx';
+import {
+    useReactTable,
+    getCoreRowModel,
+    getSortedRowModel,
+    getFilteredRowModel,
+    flexRender,
+    SortingState,
+    ColumnDef
+} from '@tanstack/react-table';
 
 interface ProjectListProps {
     projects: Project[];
@@ -18,6 +31,25 @@ interface ProjectListProps {
 }
 
 export function ProjectList({ projects, onRowClick }: ProjectListProps) {
+    const [sorting, setSorting] = useState<SortingState>([]);
+    const [globalFilter, setGlobalFilter] = useState('');
+
+    const handleExport = () => {
+        const exportData = projects.map(p => ({
+            'Kod': p.code || '-',
+            'Proje Adı': p.name,
+            'Durum': getStatusLabel(p.status),
+            'Başlangıç': p.start_date || '-',
+            'Bütçe': p.planned_budget ? new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(p.planned_budget) : '-',
+            'Blok Sayısı': p.blocks_count || 0,
+            'Ünite Sayısı': p.units_count || 0,
+        }));
+
+        const ws = XLSX.utils.json_to_sheet(exportData);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Projeler");
+        XLSX.writeFile(wb, `Projeler_${new Date().toISOString().split('T')[0]}.xlsx`);
+    };
 
     const getStatusVariant = (status: string) => {
         switch (status) {
@@ -37,48 +69,164 @@ export function ProjectList({ projects, onRowClick }: ProjectListProps) {
         }
     };
 
+    const columns = useMemo<ColumnDef<Project>[]>(() => [
+        {
+            accessorKey: 'code',
+            header: ({ column }) => {
+                return (
+                    <Button variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === "asc")} className="h-8 p-0 text-xs font-semibold hover:bg-transparent">
+                        Kod
+                        <ChevronsUpDown className="ml-2 h-4 w-4" />
+                    </Button>
+                )
+            },
+            cell: ({ row }) => <span className="font-semibold text-primary/80">{row.getValue('code') || '-'}</span>,
+            size: 100,
+        },
+        {
+            accessorKey: 'name',
+            header: ({ column }) => {
+                return (
+                    <Button variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === "asc")} className="h-8 p-0 text-xs font-semibold hover:bg-transparent">
+                        Proje Adı
+                        <ChevronsUpDown className="ml-2 h-4 w-4" />
+                    </Button>
+                )
+            },
+            cell: ({ row }) => <span className="font-medium text-slate-800">{row.getValue('name')}</span>,
+        },
+        {
+            accessorKey: 'blocks_count',
+            header: () => <span className="text-xs font-semibold">Bloklar</span>,
+            cell: ({ row }) => <span className="text-slate-600">{row.original.blocks_count || 0} Blok</span>,
+            size: 120,
+        },
+        {
+            accessorKey: 'units_count',
+            header: () => <span className="text-xs font-semibold">Üniteler</span>,
+            cell: ({ row }) => <span className="text-slate-600">{row.original.units_count || 0} Ünite</span>,
+            size: 120,
+        },
+        {
+            accessorKey: 'status',
+            header: () => <span className="text-xs font-semibold">Durum</span>,
+            cell: ({ row }) => {
+                const status = row.getValue('status') as string;
+                return (
+                    <Badge variant={getStatusVariant(status) as "default" | "secondary" | "outline"} className="shadow-sm">
+                        {getStatusLabel(status)}
+                    </Badge>
+                )
+            },
+            size: 130,
+        },
+        {
+            accessorKey: 'planned_budget',
+            header: ({ column }) => {
+                return (
+                    <div className="flex justify-end pr-2">
+                        <Button variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === "asc")} className="h-8 p-0 text-xs font-semibold hover:bg-transparent">
+                            Planlanan Bütçe
+                            <ChevronsUpDown className="ml-2 h-4 w-4" />
+                        </Button>
+                    </div>
+                )
+            },
+            cell: ({ row }) => {
+                const amount = parseFloat(row.getValue("planned_budget"));
+                const formatted = isNaN(amount) ? '-' : new Intl.NumberFormat("tr-TR", {
+                    style: "currency",
+                    currency: "TRY",
+                }).format(amount);
+                return <div className="text-right font-medium pr-2 text-slate-700">{formatted}</div>
+            },
+        },
+    ], []);
+
+    const table = useReactTable({
+        data: projects,
+        columns,
+        getCoreRowModel: getCoreRowModel(),
+        onSortingChange: setSorting,
+        getSortedRowModel: getSortedRowModel(),
+        onGlobalFilterChange: setGlobalFilter,
+        getFilteredRowModel: getFilteredRowModel(),
+        state: {
+            sorting,
+            globalFilter,
+        },
+    });
+
     return (
-        <div className="w-full">
-            <Table>
-                <TableHeader>
-                    <TableRow className="bg-muted/50">
-                        <TableHead className="w-[100px]">Kod</TableHead>
-                        <TableHead>Proje Adı</TableHead>
-                        <TableHead>Durum</TableHead>
-                        <TableHead className="text-right">Bütçe</TableHead>
-                    </TableRow>
-                </TableHeader>
-                <TableBody>
-                    {projects.length === 0 ? (
-                        <TableRow>
-                            <TableCell colSpan={4} className="h-24 text-center">
-                                Proje bulunamadı.
-                            </TableCell>
-                        </TableRow>
-                    ) : (
-                        projects.map((project) => (
-                            <TableRow
-                                key={project.id}
-                                className="cursor-pointer hover:bg-muted/50 transition-colors"
-                                onClick={() => onRowClick(project)}
-                            >
-                                <TableCell className="font-medium">{project.code}</TableCell>
-                                <TableCell>{project.name}</TableCell>
-                                <TableCell>
-                                    <Badge variant={getStatusVariant(project.status) as "default" | "secondary" | "outline"}>
-                                        {getStatusLabel(project.status)}
-                                    </Badge>
-                                </TableCell>
-                                <TableCell className="text-right">
-                                    {project.planned_budget ?
-                                        new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(project.planned_budget)
-                                        : '-'}
+        <div className="flex flex-col h-full bg-white rounded-md">
+            {/* Odoo Style Toolbar Setup in Component */}
+            <div className="flex items-center justify-between p-3 border-b bg-slate-50/50">
+                <div className="relative group w-72">
+                    <Search className="absolute left-2.5 top-2 h-4 w-4 text-slate-400" />
+                    <Input
+                        placeholder="Projelerde ara..."
+                        value={globalFilter ?? ""}
+                        onChange={(event) => setGlobalFilter(event.target.value)}
+                        className="h-8 pl-9 w-full bg-white transition-colors focus-visible:ring-1 focus-visible:ring-primary shadow-sm"
+                    />
+                </div>
+                <div className="flex items-center space-x-2">
+                    <Button variant="outline" size="sm" onClick={handleExport} className="h-8 shadow-sm text-xs" title="Excel Olarak İndir">
+                        <Download className="mr-2 h-3.5 w-3.5" /> Dışa Aktar
+                    </Button>
+                </div>
+            </div>
+
+            <div className="flex-auto overflow-auto relative">
+                <Table>
+                    <TableHeader className="bg-slate-50/80 sticky top-0 z-10 backdrop-blur-sm">
+                        {table.getHeaderGroups().map((headerGroup) => (
+                            <TableRow key={headerGroup.id} className="hover:bg-transparent border-b">
+                                {headerGroup.headers.map((header) => {
+                                    return (
+                                        <TableHead key={header.id} style={{ width: header.getSize() }} className="h-10 text-slate-600">
+                                            {header.isPlaceholder
+                                                ? null
+                                                : flexRender(
+                                                    header.column.columnDef.header,
+                                                    header.getContext()
+                                                )}
+                                        </TableHead>
+                                    )
+                                })}
+                            </TableRow>
+                        ))}
+                    </TableHeader>
+                    <TableBody>
+                        {table.getRowModel().rows?.length ? (
+                            table.getRowModel().rows.map((row) => (
+                                <TableRow
+                                    key={row.id}
+                                    data-state={row.getIsSelected() && "selected"}
+                                    onClick={() => onRowClick(row.original)}
+                                    className="cursor-pointer hover:bg-blue-50/50 transition-colors group"
+                                >
+                                    {row.getVisibleCells().map((cell) => (
+                                        <TableCell key={cell.id} className="py-2.5 border-b border-slate-100 group-hover:border-blue-100">
+                                            {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                                        </TableCell>
+                                    ))}
+                                </TableRow>
+                            ))
+                        ) : (
+                            <TableRow>
+                                <TableCell colSpan={columns.length} className="h-24 text-center text-slate-500">
+                                    Sonuç bulunamadı.
                                 </TableCell>
                             </TableRow>
-                        ))
-                    )}
-                </TableBody>
-            </Table>
+                        )}
+                    </TableBody>
+                </Table>
+            </div>
+
+            <div className="p-3 py-2 border-t bg-slate-50/50 text-xs text-slate-500 flex justify-between items-center shrink-0">
+                <span>Toplam {table.getFilteredRowModel().rows.length} proje listeleniyor</span>
+            </div>
         </div>
     );
 }

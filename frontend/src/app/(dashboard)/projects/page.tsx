@@ -6,6 +6,7 @@ import { ProjectList } from '@/components/projects/ProjectList';
 import { ProjectDetailPanel } from '@/components/projects/ProjectDetailPanel';
 import { Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import api from '@/lib/api/index';
 
 import { Project } from '@/types/project.types';
 
@@ -17,16 +18,10 @@ export default function ProjectsPage() {
         const fetchProjects = async () => {
             try {
                 setLoading(true);
-                // Replace with actual API call once Backend is ready
-                // const response = await projectService.getAll();
-                // setProjects(response.data);
-
-                // Dummy Data for UI Development
-                setProjects([
-                    { id: 1, name: 'Belcon Tower', code: 'PRJ-001', status: 'active', planned_budget: 5000000 },
-                    { id: 2, name: 'Sunset Villas', code: 'PRJ-002', status: 'planned', planned_budget: 2500000 },
-                    { id: 3, name: 'Downtown Plaza', code: 'PRJ-003', status: 'completed', planned_budget: 8000000 },
-                ]);
+                const response = await api.get('/projects');
+                // Handle paginated response or simple array
+                const data = response.data?.data || response.data || [];
+                setProjects(data);
             } catch (error) {
                 console.error('Failed to fetch projects', error);
             } finally {

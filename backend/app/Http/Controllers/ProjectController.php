@@ -12,9 +12,28 @@ class ProjectController extends Controller
     public function index(Request $request)
     {
         $user = $request->user();
-        $projects = $user->hasRole('Admin') 
-            ? \App\Models\Project::latest()->paginate(20)
-            : $user->projects()->latest()->paginate(20);
+        
+        $query = \App\Models\Project::withCount(['blocks', 'units']);
+
+        if ($request->has('search')) {
+            $search = $request->search;
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                  ->orWhere('code', 'like', "%{$search}%");
+            });
+        }
+
+        if ($request->has('status') && $request->status !== 'all' && $request->status !== '') {
+            $query->where('status', $request->status);
+        }
+
+        if (!$user->hasRole('Admin')) {
+            $query->whereHas('users', function ($q) use ($user) {
+                $q->where('users.id', $user->id);
+            });
+        }
+
+        $projects = $query->latest()->paginate(20);
 
         return response()->json($projects);
     }

@@ -11,9 +11,19 @@ class BlockController extends Controller
      */
     public function index(Request $request)
     {
-        $blocks = \App\Models\Block::where('project_id', $request->active_project_id)
-            ->withCount('units')
-            ->get();
+        $query = \App\Models\Block::where('project_id', $request->active_project_id)
+            ->withCount('units');
+
+        if ($request->has('search')) {
+            $search = $request->search;
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                  ->orWhere('code', 'like', "%{$search}%")
+                  ->orWhere('parcel_island', 'like', "%{$search}%");
+            });
+        }
+
+        $blocks = $query->get();
 
         return response()->json($blocks);
     }
