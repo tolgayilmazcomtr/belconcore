@@ -6,6 +6,7 @@ import api from "@/lib/api"
 import { Home } from "lucide-react"
 import { UnitList } from "@/components/units/UnitList"
 import { UnitCreateModal } from "@/components/units/UnitCreateModal"
+import { UnitBulkCreateModal } from "@/components/units/UnitBulkCreateModal"
 
 export default function UnitsPage() {
     const { activeProject } = useProjectStore()
@@ -58,6 +59,7 @@ export default function UnitsPage() {
                     </p>
                 </div>
                 <div className="flex items-center space-x-2">
+                    <UnitBulkCreateModal />
                     <UnitCreateModal />
                 </div>
             </div>

@@ -24,6 +24,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // Seçili Proje İçi Modüller (Blok ve Bağımsız Bölüm)
     Route::middleware('project.access')->group(function () {
         Route::apiResource('blocks', BlockController::class);
+        Route::post('units/bulk', [UnitController::class, 'storeBulk']);
         Route::apiResource('units', UnitController::class);
     });
 });

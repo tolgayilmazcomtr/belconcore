@@ -54,6 +54,52 @@ class UnitController extends Controller
         return response()->json(['message' => 'Ünite başarıyla oluşturuldu.', 'data' => $unit], 201);
     }
 
+    public function storeBulk(Request $request)
+    {
+        $validated = $request->validate([
+            'units' => 'required|array|min:1',
+            'units.*.block_id' => 'nullable|exists:blocks,id',
+            'units.*.unit_no' => 'required|string|max:50',
+            'units.*.floor_no' => 'nullable|string|max:50',
+            'units.*.unit_type' => 'required|string|max:50',
+            'units.*.gross_area' => 'nullable|numeric|min:0',
+            'units.*.net_area' => 'nullable|numeric|min:0',
+            'units.*.status' => 'required|in:available,reserved,sold,not_for_sale',
+            'units.*.list_price' => 'nullable|numeric|min:0',
+        ]);
+
+        $projectId = $request->active_project_id;
+        $createdUnits = [];
+
+        \Illuminate\Support\Facades\DB::beginTransaction();
+        try {
+            foreach ($validated['units'] as $unitData) {
+                $existsQuery = \App\Models\Unit::where('project_id', $projectId)
+                    ->where('unit_no', $unitData['unit_no']);
+                
+                if (!empty($unitData['block_id'])) {
+                    $existsQuery->where('block_id', $unitData['block_id']);
+                } else {
+                    $existsQuery->whereNull('block_id');
+                }
+
+                if ($existsQuery->exists()) {
+                    \Illuminate\Support\Facades\DB::rollBack();
+                    return response()->json(['message' => "{$unitData['unit_no']} numaralı ünite kodu (Kapı No) projede zaten mevcut. Lütfen eşsiz olduğundan emin olun."], 422);
+                }
+
+                $unitData['project_id'] = $projectId;
+                $unit = \App\Models\Unit::create($unitData);
+                $createdUnits[] = $unit->load('block');
+            }
+            \Illuminate\Support\Facades\DB::commit();
+            return response()->json(['message' => count($createdUnits) . ' adet ünite başarıyla oluşturuldu.', 'data' => $createdUnits], 201);
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\DB::rollBack();
+            return response()->json(['message' => 'Toplu kayıt sırasında bir sunucu hatası oluştu.'], 500);
+        }
+    }
+
     public function show(string $id)
     {
         $unit = \App\Models\Unit::with('block')->findOrFail($id);
