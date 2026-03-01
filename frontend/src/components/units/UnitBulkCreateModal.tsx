@@ -132,7 +132,10 @@ export function UnitBulkCreateModal() {
                 return payload;
             });
 
-            const response = await api.post("/units/bulk", { units: formattedUnits })
+            const response = await api.post("/units/bulk", {
+                units: formattedUnits,
+                active_project_id: activeProject.id
+            })
 
             if (response.data && response.data.data) {
                 const newUnits = response.data.data;
@@ -162,7 +165,7 @@ export function UnitBulkCreateModal() {
                     <ListPlus className="mr-1.5 h-4 w-4" /> Toplu Ünite Ekle
                 </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-[1400px] w-[95vw] h-[90vh] flex flex-col p-0 gap-0 overflow-hidden bg-[#f8f9fa]">
+            <DialogContent style={{ maxWidth: "1400px" }} className="w-[95vw] h-[90vh] flex flex-col p-0 gap-0 overflow-hidden bg-[#f8f9fa]">
                 <DialogHeader className="px-6 py-4 border-b bg-white shrink-0">
                     <div className="flex items-center justify-between">
                         <div>
