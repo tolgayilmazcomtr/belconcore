@@ -60,7 +60,15 @@ export function Sidebar() {
           <SidebarSubItem icon={<Home size={16} />} label="Üniteler / Daireler" href="/units" collapsed={collapsed} />
         </SidebarExpandableItem>
 
-        <SidebarItem icon={<Users size={20} className="shrink-0" />} label="CRM & Satış" href="/crm" collapsed={collapsed} />
+        <SidebarExpandableItem
+          icon={<Users size={20} className="shrink-0" />}
+          label="CRM & Satış"
+          collapsed={collapsed}
+          activePaths={["/customers", "/crm"]}
+        >
+          <SidebarSubItem icon={<Users size={16} />} label="Müşteriler" href="/customers" collapsed={collapsed} />
+          <SidebarSubItem icon={<PieChart size={16} />} label="Fırsatlar" href="/crm" collapsed={collapsed} />
+        </SidebarExpandableItem>
         <SidebarItem icon={<FileText size={20} className="shrink-0" />} label="Teklifler" href="/offers" collapsed={collapsed} />
         <SidebarItem icon={<WalletCards size={20} className="shrink-0" />} label="Ön Muhasebe" href="/accounting" collapsed={collapsed} />
         <SidebarItem icon={<Warehouse size={20} className="shrink-0" />} label="Stok & Maliyet" href="/inventory" collapsed={collapsed} />

@@ -31,4 +31,14 @@ class Unit extends Model
     {
         return $this->belongsTo(Block::class);
     }
+
+    public function leads()
+    {
+        return $this->hasMany(Lead::class);
+    }
+
+    public function offers()
+    {
+        return $this->hasMany(Offer::class);
+    }
 }

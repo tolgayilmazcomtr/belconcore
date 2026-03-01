@@ -40,6 +40,84 @@ export interface Unit {
     block?: Block;
 }
 
+export interface Customer {
+    id: number;
+    project_id: number;
+    type: 'individual' | 'corporate';
+    first_name?: string;
+    last_name?: string;
+    company_name?: string;
+    email?: string;
+    phone?: string;
+    tax_office?: string;
+    tax_number?: string;
+    address?: string;
+    city?: string;
+    district?: string;
+    country?: string;
+    leads_count?: number;
+    offers_count?: number;
+    created_at?: string;
+    updated_at?: string;
+}
+
+export interface Activity {
+    id: number;
+    project_id: number;
+    lead_id: number;
+    type: 'call' | 'meeting' | 'email' | 'note';
+    subject: string;
+    notes?: string;
+    due_date?: string;
+    is_completed: boolean;
+    user_id?: number;
+    user?: any; // To do: add User interface later if needed
+    created_at?: string;
+    updated_at?: string;
+}
+
+export interface Offer {
+    id: number;
+    project_id: number;
+    lead_id: number;
+    customer_id: number;
+    unit_id?: number;
+    offer_no: string;
+    valid_until?: string;
+    status: 'draft' | 'sent' | 'accepted' | 'rejected';
+    base_price: number;
+    discount_amount: number;
+    final_price: number;
+    payment_plan?: any;
+    notes?: string;
+    created_by?: number;
+    customer?: Customer;
+    unit?: Unit;
+    creator?: any;
+    created_at?: string;
+    updated_at?: string;
+}
+
+export interface Lead {
+    id: number;
+    project_id: number;
+    customer_id?: number;
+    unit_id?: number;
+    title: string;
+    description?: string;
+    source?: string;
+    status: 'new' | 'contacted' | 'qualified' | 'proposal' | 'won' | 'lost';
+    expected_value?: number;
+    assigned_to?: number;
+    customer?: Customer;
+    unit?: Unit;
+    assignee?: any;
+    activities?: Activity[];
+    offers?: Offer[];
+    created_at?: string;
+    updated_at?: string;
+}
+
 // API Response Definitions
 export interface ApiResponse<T> {
     data: T;

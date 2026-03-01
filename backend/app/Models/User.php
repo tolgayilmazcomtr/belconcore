@@ -36,6 +36,21 @@ class User extends Authenticatable
         return $this->belongsTo(Project::class, 'current_project_id');
     }
 
+    public function assignedLeads()
+    {
+        return $this->hasMany(Lead::class, 'assigned_to');
+    }
+
+    public function activities()
+    {
+        return $this->hasMany(Activity::class);
+    }
+
+    public function createdOffers()
+    {
+        return $this->hasMany(Offer::class, 'created_by');
+    }
+
     /**
      * The attributes that should be hidden for serialization.
      *

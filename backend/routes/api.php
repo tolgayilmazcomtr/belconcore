@@ -6,6 +6,10 @@ use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\BlockController;
 use App\Http\Controllers\UnitController;
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\CustomerController;
+use App\Http\Controllers\LeadController;
+use App\Http\Controllers\ActivityController;
+use App\Http\Controllers\OfferController;
 
 // Public Auth Routes
 Route::post('/login', [AuthController::class, 'login']);
@@ -26,5 +30,12 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::apiResource('blocks', BlockController::class);
         Route::post('units/bulk', [UnitController::class, 'storeBulk']);
         Route::apiResource('units', UnitController::class);
+        
+        // CRM & Sales
+        Route::apiResource('customers', CustomerController::class);
+        Route::put('leads/{lead}/status', [LeadController::class, 'updateStatus']);
+        Route::apiResource('leads', LeadController::class);
+        Route::apiResource('activities', ActivityController::class);
+        Route::apiResource('offers', OfferController::class);
     });
 });
