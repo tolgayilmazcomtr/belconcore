@@ -21,8 +21,11 @@ class EnsureUserHasProjectAccess
             return response()->json(['message' => 'Unauthenticated.'], 401);
         }
 
-        // İstekten veya kullanıcının mevcut projesinden project_id'yi al
-        $projectId = $request->header('X-Project-Id') ?? $user->current_project_id;
+        // İstekten (Header, Query Params veya Body) veya kullanıcının mevcut projesinden project_id'yi al
+        $projectId = $request->header('X-Project-Id') 
+            ?? $request->input('project_id') 
+            ?? $request->input('active_project_id') 
+            ?? $user->current_project_id;
 
         // Admin rolü her projeye erişebilir ancak active_project_id sistemin çalışması için gereklidir
         if ($user->hasRole('Admin')) {
