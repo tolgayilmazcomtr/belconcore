@@ -1,0 +1,292 @@
+"use client"
+
+import { useState, useEffect } from "react"
+import { useForm } from "react-hook-form"
+import { zodResolver } from "@hookform/resolvers/zod"
+import * as z from "zod"
+import api from "@/lib/api"
+import { useProjectStore } from "@/store/useProjectStore"
+import { toast } from "sonner"
+
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
+} from "@/components/ui/dialog"
+import {
+    Form,
+    FormControl,
+    FormField,
+    FormItem,
+    FormLabel,
+    FormMessage,
+} from "@/components/ui/form"
+import { Input } from "@/components/ui/input"
+import { Button } from "@/components/ui/button"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Plus, Loader2 } from "lucide-react"
+
+const formSchema = z.object({
+    block_id: z.string().optional(),
+    unit_no: z.string().min(1, "Ünite numarası (Kapı No) zorunludur"),
+    floor_no: z.string().optional(),
+    unit_type: z.string().min(1, "Ünite tipi zorunludur (Örn: 2+1)"),
+    gross_area: z.string().optional(),
+    net_area: z.string().optional(),
+    status: z.enum(["available", "sold", "reserved", "not_for_sale"]),
+    list_price: z.string().optional(),
+})
+
+export function UnitCreateModal() {
+    const [open, setOpen] = useState(false)
+    const [loading, setLoading] = useState(false)
+    const { activeProject, units, setUnits, blocks, setBlocks } = useProjectStore()
+
+    // Yükleme sırasında blokları çek
+    useEffect(() => {
+        if (open && activeProject && blocks.length === 0) {
+            api.get('/blocks', { params: { project_id: activeProject.id } })
+                .then(res => setBlocks(res.data?.data || res.data || []))
+                .catch(err => console.error("Bloklar yüklenemedi", err))
+        }
+    }, [open, activeProject, blocks.length, setBlocks])
+
+    const form = useForm<z.infer<typeof formSchema>>({
+        resolver: zodResolver(formSchema),
+        defaultValues: {
+            block_id: "none",
+            unit_no: "",
+            floor_no: "",
+            unit_type: "",
+            gross_area: "",
+            net_area: "",
+            status: "available",
+            list_price: "",
+        },
+    })
+
+    async function onSubmit(values: z.infer<typeof formSchema>) {
+        if (!activeProject) {
+            toast.error("Hata", { description: "Lütfen önce bir proje seçin." })
+            return
+        }
+
+        setLoading(true)
+        try {
+            const payload: Record<string, string | number> = {
+                unit_no: values.unit_no,
+                unit_type: values.unit_type,
+                status: values.status,
+                active_project_id: activeProject.id
+            };
+
+            if (values.block_id && values.block_id !== "none") payload.block_id = parseInt(values.block_id);
+            if (values.floor_no) payload.floor_no = values.floor_no;
+            if (values.gross_area) payload.gross_area = parseFloat(values.gross_area);
+            if (values.net_area) payload.net_area = parseFloat(values.net_area);
+            if (values.list_price) payload.list_price = parseFloat(values.list_price);
+
+            const response = await api.post("/units", payload)
+
+            // Modeli liste üzerine ekle (with('block') API'den geldiği için relation içerecektir)
+            if (response.data && response.data.data) {
+                // Fetch the block relation manually if it is not returned (UnitController store currently does not return block relation)
+                // Actually it may just return block_id. We can append it directly, but for precise table display, let's fetch it from store if needed
+                const newUnit = response.data.data;
+                if (!newUnit.block && newUnit.block_id) {
+                    newUnit.block = blocks.find(b => b.id === newUnit.block_id);
+                }
+                setUnits([newUnit, ...units])
+            }
+
+            toast.success("Mükemmel!", {
+                description: "Yeni ünite başarıyla oluşturuldu.",
+            })
+
+            setOpen(false)
+            form.reset()
+        } catch (error: any) {
+            toast.error("Hata", {
+                description: error.response?.data?.message || "Ünite oluşturulurken bir hata meydana geldi.",
+            })
+        } finally {
+            setLoading(false)
+        }
+    }
+
+    return (
+        <Dialog open={open} onOpenChange={setOpen}>
+            <DialogTrigger asChild>
+                <Button className="bg-primary hover:bg-primary/90 shadow-sm h-8 px-3">
+                    <Plus className="mr-1.5 h-4 w-4" /> Yeni Ünite
+                </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[425px]">
+                <DialogHeader>
+                    <DialogTitle>Yeni Ünite Ekle</DialogTitle>
+                    <DialogDescription>
+                        <strong>{activeProject?.name}</strong> projesine yeni bir bağımsız bölüm (daire/dükkan) tanımlayın.
+                    </DialogDescription>
+                </DialogHeader>
+
+                <Form {...form}>
+                    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 pt-2">
+
+                        <div className="grid grid-cols-2 gap-4">
+                            <FormField
+                                control={form.control}
+                                name="block_id"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Bağlı Blok (Opsiyonel)</FormLabel>
+                                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                            <FormControl>
+                                                <SelectTrigger>
+                                                    <SelectValue placeholder="Blok Seçin" />
+                                                </SelectTrigger>
+                                            </FormControl>
+                                            <SelectContent>
+                                                <SelectItem value={"none"}>Blok Yok / Bağımsız</SelectItem>
+                                                {blocks.map(block => (
+                                                    <SelectItem key={block.id} value={block.id.toString()}>{block.name} (Kod: {block.code || '-'})</SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+
+                            <FormField
+                                control={form.control}
+                                name="status"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Durum</FormLabel>
+                                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                            <FormControl>
+                                                <SelectTrigger>
+                                                    <SelectValue placeholder="Durum Seçin" />
+                                                </SelectTrigger>
+                                            </FormControl>
+                                            <SelectContent>
+                                                <SelectItem value="available">Satışa Uygun</SelectItem>
+                                                <SelectItem value="reserved">Rezerve</SelectItem>
+                                                <SelectItem value="sold">Satıldı</SelectItem>
+                                                <SelectItem value="not_for_sale">Satışa Kapalı</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                            <FormField
+                                control={form.control}
+                                name="unit_no"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Kapı No</FormLabel>
+                                        <FormControl>
+                                            <Input placeholder="Örn: 24" {...field} />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+
+                            <FormField
+                                control={form.control}
+                                name="floor_no"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Kat Bilgisi</FormLabel>
+                                        <FormControl>
+                                            <Input placeholder="Örn: 4. Kat" {...field} />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                            <FormField
+                                control={form.control}
+                                name="unit_type"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Ünite Tipi</FormLabel>
+                                        <FormControl>
+                                            <Input placeholder="Örn: 3+1" {...field} />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+
+                            <FormField
+                                control={form.control}
+                                name="list_price"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Liste Fiyatı (TL)</FormLabel>
+                                        <FormControl>
+                                            <Input type="number" step="0.01" placeholder="0.00" {...field} />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                            <FormField
+                                control={form.control}
+                                name="gross_area"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Brüt Alan (m²)</FormLabel>
+                                        <FormControl>
+                                            <Input type="number" step="0.01" placeholder="0.00" {...field} />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+
+                            <FormField
+                                control={form.control}
+                                name="net_area"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Net Alan (m²)</FormLabel>
+                                        <FormControl>
+                                            <Input type="number" step="0.01" placeholder="0.00" {...field} />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                        </div>
+
+                        <div className="pt-4 flex justify-end">
+                            <Button type="button" variant="outline" className="mr-2" onClick={() => setOpen(false)}>
+                                İptal
+                            </Button>
+                            <Button type="submit" disabled={loading}>
+                                {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                Kaydet
+                            </Button>
+                        </div>
+                    </form>
+                </Form>
+            </DialogContent>
+        </Dialog>
+    )
+}

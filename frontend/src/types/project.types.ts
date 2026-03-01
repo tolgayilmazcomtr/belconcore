@@ -33,10 +33,11 @@ export interface Unit {
     unit_type?: string;
     gross_area?: number;
     net_area?: number;
-    status: 'available' | 'sold' | 'reserved' | 'maintenance';
+    status: 'available' | 'sold' | 'reserved' | 'maintenance' | 'not_for_sale';
     list_price?: number;
     created_at?: string;
     updated_at?: string;
+    block?: Block;
 }
 
 // API Response Definitions
