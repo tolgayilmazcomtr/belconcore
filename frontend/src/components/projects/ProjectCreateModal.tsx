@@ -94,7 +94,7 @@ export function ProjectCreateModal() {
                     <PlusCircle className="mr-2 h-4 w-4" /> Yeni Proje
                 </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-[425px]">
+            <DialogContent className="sm:max-w-[600px]">
                 <DialogHeader>
                     <DialogTitle>Yeni Proje Ekle</DialogTitle>
                     <DialogDescription>

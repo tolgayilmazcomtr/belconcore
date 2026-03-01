@@ -162,13 +162,13 @@ export function UnitBulkCreateModal() {
                     <ListPlus className="mr-1.5 h-4 w-4" /> Toplu Ünite Ekle
                 </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-[7xl] w-[95vw] h-[90vh] flex flex-col p-0 gap-0 overflow-hidden bg-[#f8f9fa]">
+            <DialogContent className="max-w-[1400px] w-[95vw] h-[90vh] flex flex-col p-0 gap-0 overflow-hidden bg-[#f8f9fa]">
                 <DialogHeader className="px-6 py-4 border-b bg-white shrink-0">
                     <div className="flex items-center justify-between">
                         <div>
                             <DialogTitle className="text-xl">Toplu Ünite (Daire) Girişi</DialogTitle>
                             <DialogDescription className="mt-1">
-                                <strong>{activeProject?.name}</strong> projesine hızlıca birden çok ünite tanımlayın. Odoo/SAP tarzı hücre içi veri girişi.
+                                <strong>{activeProject?.name}</strong> projesine hızlıca birden çok ünite tanımlayın.
                             </DialogDescription>
                         </div>
                         <div className="flex items-center gap-2">

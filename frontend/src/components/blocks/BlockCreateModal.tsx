@@ -95,7 +95,7 @@ export function BlockCreateModal() {
                     <Plus className="mr-1.5 h-4 w-4" /> Yeni Blok
                 </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-[425px]">
+            <DialogContent className="sm:max-w-[600px]">
                 <DialogHeader>
                     <DialogTitle>Yeni Blok Ekle</DialogTitle>
                     <DialogDescription>

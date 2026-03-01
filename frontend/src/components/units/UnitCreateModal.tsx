@@ -124,7 +124,7 @@ export function UnitCreateModal() {
                     <Plus className="mr-1.5 h-4 w-4" /> Yeni Ünite
                 </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-[425px]">
+            <DialogContent className="sm:max-w-[600px]">
                 <DialogHeader>
                     <DialogTitle>Yeni Ünite Ekle</DialogTitle>
                     <DialogDescription>
