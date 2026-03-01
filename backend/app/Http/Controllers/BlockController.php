@@ -38,8 +38,13 @@ class BlockController extends Controller
 
         $validated['project_id'] = $request->active_project_id;
 
-        if ($validated['code'] && \App\Models\Block::where('project_id', $validated['project_id'])->where('code', $validated['code'])->exists()) {
-            return response()->json(['message' => 'Bu blok kodu seçili projede zaten mevcut.'], 422);
+        if (!empty($validated['code'])) {
+            $exists = \App\Models\Block::where('project_id', $validated['project_id'])
+                ->where('code', $validated['code'])
+                ->exists();
+            if ($exists) {
+                return response()->json(['message' => 'Bu blok kodu seçili projede zaten mevcut.'], 422);
+            }
         }
 
         $block = \App\Models\Block::create($validated);
@@ -62,8 +67,14 @@ class BlockController extends Controller
             'parcel_island' => 'nullable|string|max:100',
         ]);
 
-        if ($validated['code'] && \App\Models\Block::where('project_id', $block->project_id)->where('code', $validated['code'])->where('id', '!=', $block->id)->exists()) {
-            return response()->json(['message' => 'Bu blok kodu seçili projede zaten mevcut.'], 422);
+        if (!empty($validated['code'])) {
+            $exists = \App\Models\Block::where('project_id', $block->project_id)
+                ->where('code', $validated['code'])
+                ->where('id', '!=', $block->id)
+                ->exists();
+            if ($exists) {
+                return response()->json(['message' => 'Bu blok kodu seçili projede zaten mevcut.'], 422);
+            }
         }
 
         $block->update($validated);
