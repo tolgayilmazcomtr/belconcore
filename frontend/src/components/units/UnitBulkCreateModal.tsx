@@ -113,6 +113,18 @@ export function UnitBulkCreateModal() {
         }
     }, [open, replace])
 
+    const handleKeyDown = (e: React.KeyboardEvent<HTMLElement>, rowIndex: number, colName: string) => {
+        if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            const target = document.querySelector(`[data-rowindex="${rowIndex - 1}"][data-colname="${colName}"]`) as HTMLElement;
+            if (target) target.focus();
+        } else if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            const target = document.querySelector(`[data-rowindex="${rowIndex + 1}"][data-colname="${colName}"]`) as HTMLElement;
+            if (target) target.focus();
+        }
+    }
+
     async function onSubmit(values: z.infer<typeof formSchema>) {
         if (!activeProject) return;
 
@@ -216,7 +228,9 @@ export function UnitBulkCreateModal() {
                                                 <FormField control={form.control} name={`units.${index}.block_id`} render={({ field }) => (
                                                     <FormItem className="space-y-0"><FormControl>
                                                         <Select onValueChange={field.onChange} value={field.value}>
-                                                            <FormControl><SelectTrigger className="h-8 shadow-none border-transparent hover:border-slate-200 focus:border-primary focus:ring-1 rounded-sm"><SelectValue placeholder="Seçim" /></SelectTrigger></FormControl>
+                                                            <FormControl>
+                                                                <SelectTrigger data-rowindex={index} data-colname="block_id" onKeyDown={(e) => handleKeyDown(e, index, "block_id")} className="h-8 shadow-none border-transparent hover:border-slate-200 focus:border-primary focus:ring-1 rounded-sm"><SelectValue placeholder="Seçim" /></SelectTrigger>
+                                                            </FormControl>
                                                             <SelectContent>
                                                                 <SelectItem value="none">Yok (Bağımsız)</SelectItem>
                                                                 {blocks.map(b => (
@@ -230,35 +244,35 @@ export function UnitBulkCreateModal() {
                                             <td className="px-2 py-1.5">
                                                 <FormField control={form.control} name={`units.${index}.unit_no`} render={({ field }) => (
                                                     <FormItem className="space-y-0"><FormControl>
-                                                        <Input placeholder="Kapı No" className="h-8 shadow-none border-transparent hover:border-slate-200 focus-visible:ring-1 rounded-sm" {...field} />
+                                                        <Input data-rowindex={index} data-colname="unit_no" onKeyDown={(e) => handleKeyDown(e, index, "unit_no")} placeholder="Kapı No" className="h-8 shadow-none border-transparent hover:border-slate-200 focus-visible:ring-1 rounded-sm" {...field} />
                                                     </FormControl></FormItem>
                                                 )} />
                                             </td>
                                             <td className="px-2 py-1.5">
                                                 <FormField control={form.control} name={`units.${index}.floor_no`} render={({ field }) => (
                                                     <FormItem className="space-y-0"><FormControl>
-                                                        <Input placeholder="Kat" className="h-8 shadow-none border-transparent hover:border-slate-200 focus-visible:ring-1 rounded-sm" {...field} />
+                                                        <Input data-rowindex={index} data-colname="floor_no" onKeyDown={(e) => handleKeyDown(e, index, "floor_no")} placeholder="Kat" className="h-8 shadow-none border-transparent hover:border-slate-200 focus-visible:ring-1 rounded-sm" {...field} />
                                                     </FormControl></FormItem>
                                                 )} />
                                             </td>
                                             <td className="px-2 py-1.5">
                                                 <FormField control={form.control} name={`units.${index}.unit_type`} render={({ field }) => (
                                                     <FormItem className="space-y-0"><FormControl>
-                                                        <Input placeholder="3+1" className="h-8 shadow-none border-transparent hover:border-slate-200 focus-visible:ring-1 rounded-sm" {...field} />
+                                                        <Input data-rowindex={index} data-colname="unit_type" onKeyDown={(e) => handleKeyDown(e, index, "unit_type")} placeholder="3+1" className="h-8 shadow-none border-transparent hover:border-slate-200 focus-visible:ring-1 rounded-sm" {...field} />
                                                     </FormControl></FormItem>
                                                 )} />
                                             </td>
                                             <td className="px-2 py-1.5">
                                                 <FormField control={form.control} name={`units.${index}.gross_area`} render={({ field }) => (
                                                     <FormItem className="space-y-0"><FormControl>
-                                                        <Input type="number" step="0.01" placeholder="0" className="h-8 shadow-none border-transparent hover:border-slate-200 focus-visible:ring-1 rounded-sm" {...field} />
+                                                        <Input data-rowindex={index} data-colname="gross_area" onKeyDown={(e) => handleKeyDown(e, index, "gross_area")} type="number" step="0.01" placeholder="0" className="h-8 shadow-none border-transparent hover:border-slate-200 focus-visible:ring-1 rounded-sm" {...field} />
                                                     </FormControl></FormItem>
                                                 )} />
                                             </td>
                                             <td className="px-2 py-1.5">
                                                 <FormField control={form.control} name={`units.${index}.net_area`} render={({ field }) => (
                                                     <FormItem className="space-y-0"><FormControl>
-                                                        <Input type="number" step="0.01" placeholder="0" className="h-8 shadow-none border-transparent hover:border-slate-200 focus-visible:ring-1 rounded-sm" {...field} />
+                                                        <Input data-rowindex={index} data-colname="net_area" onKeyDown={(e) => handleKeyDown(e, index, "net_area")} type="number" step="0.01" placeholder="0" className="h-8 shadow-none border-transparent hover:border-slate-200 focus-visible:ring-1 rounded-sm" {...field} />
                                                     </FormControl></FormItem>
                                                 )} />
                                             </td>
@@ -266,7 +280,9 @@ export function UnitBulkCreateModal() {
                                                 <FormField control={form.control} name={`units.${index}.status`} render={({ field }) => (
                                                     <FormItem className="space-y-0"><FormControl>
                                                         <Select onValueChange={field.onChange} value={field.value}>
-                                                            <FormControl><SelectTrigger className="h-8 shadow-none border-transparent hover:border-slate-200 focus:border-primary focus:ring-1 rounded-sm"><SelectValue placeholder="Seçim" /></SelectTrigger></FormControl>
+                                                            <FormControl>
+                                                                <SelectTrigger data-rowindex={index} data-colname="status" onKeyDown={(e) => handleKeyDown(e, index, "status")} className="h-8 shadow-none border-transparent hover:border-slate-200 focus:border-primary focus:ring-1 rounded-sm"><SelectValue placeholder="Seçim" /></SelectTrigger>
+                                                            </FormControl>
                                                             <SelectContent>
                                                                 <SelectItem value="available">Satışa Uygun</SelectItem>
                                                                 <SelectItem value="reserved">Rezerve</SelectItem>
@@ -280,7 +296,7 @@ export function UnitBulkCreateModal() {
                                             <td className="px-2 py-1.5">
                                                 <FormField control={form.control} name={`units.${index}.list_price`} render={({ field }) => (
                                                     <FormItem className="space-y-0"><FormControl>
-                                                        <Input type="number" step="0.01" placeholder="0.00" className="h-8 shadow-none border-transparent hover:border-slate-200 focus-visible:ring-1 text-right font-medium rounded-sm" {...field} />
+                                                        <Input data-rowindex={index} data-colname="list_price" onKeyDown={(e) => handleKeyDown(e, index, "list_price")} type="number" step="0.01" placeholder="0.00" className="h-8 shadow-none border-transparent hover:border-slate-200 focus-visible:ring-1 text-right font-medium rounded-sm" {...field} />
                                                     </FormControl></FormItem>
                                                 )} />
                                             </td>
