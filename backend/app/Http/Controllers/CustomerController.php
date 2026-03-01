@@ -42,7 +42,7 @@ class CustomerController extends Controller
             'country' => 'nullable|string|max:255',
         ]);
 
-        $data['project_id'] = $request->header('X-Project-Id');
+        $data['project_id'] = $request->active_project_id;
 
         $customer = Customer::create($data);
 

@@ -39,7 +39,7 @@ class OfferController extends Controller
             'notes' => 'nullable|string',
         ]);
 
-        $data['project_id'] = $request->header('X-Project-Id');
+        $data['project_id'] = $request->active_project_id;
         $data['created_by'] = $request->user()->id;
         
         // Generate unique offer number logic: OFR-{YEAR}-{RANDOM}

@@ -31,7 +31,7 @@ class ActivityController extends Controller
             'is_completed' => 'nullable|boolean',
         ]);
 
-        $data['project_id'] = $request->header('X-Project-Id');
+        $data['project_id'] = $request->active_project_id;
         $data['user_id'] = $request->user()->id;
 
         $activity = Activity::create($data);

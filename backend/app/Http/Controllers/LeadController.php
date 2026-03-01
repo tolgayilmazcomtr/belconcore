@@ -36,7 +36,7 @@ class LeadController extends Controller
             'assigned_to' => 'nullable|exists:users,id',
         ]);
 
-        $data['project_id'] = $request->header('X-Project-Id');
+        $data['project_id'] = $request->active_project_id;
 
         $lead = Lead::create($data);
         $lead->load(['customer', 'assignee', 'unit']);
