@@ -12,7 +12,11 @@ import {
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { Target, User, Building, MapPin, SearchCheck, AlignLeft } from 'lucide-react';
+import { Target, User, Building, MapPin, SearchCheck, AlignLeft, FileText, Download, Calendar } from 'lucide-react';
+import { useCrmStore } from '@/store/useCrmStore';
+import { OfferCreateModal } from '@/components/crm/OfferCreateModal';
+import { Button } from '@/components/ui/button';
+import api from '@/lib/api';
 
 interface LeadDetailPanelProps {
     lead: Lead | null;
@@ -21,6 +25,13 @@ interface LeadDetailPanelProps {
 }
 
 export function LeadDetailPanel({ lead, open, onClose }: LeadDetailPanelProps) {
+    const { offers } = useCrmStore();
+
+    // Filter offers for this specific lead
+    const leadOffers = offers.filter(o => o.lead_id === lead?.id).sort((a, b) => {
+        return new Date(b.created_at || '').getTime() - new Date(a.created_at || '').getTime();
+    });
+
     if (!lead) return null;
 
     const formatMoney = (amount?: number) => {
@@ -184,8 +195,61 @@ export function LeadDetailPanel({ lead, open, onClose }: LeadDetailPanelProps) {
                                     </TabsContent>
 
                                     <TabsContent value="offers" className="m-0 h-full">
-                                        <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-8 text-center">
-                                            <p className="text-slate-500">Bu fırsat için müşteriye iletilen tekliflerin (Offer) listesi burada yer alacak.</p>
+                                        <div className="space-y-4">
+                                            <div className="flex justify-between items-center bg-white px-5 py-3 rounded-lg border border-slate-200 shadow-sm">
+                                                <div>
+                                                    <h3 className="text-slate-800 font-semibold">Teklifler</h3>
+                                                    <p className="text-xs text-slate-500">Müşteriye sunulan fiyatlandırmalar ve PDF dokümanları</p>
+                                                </div>
+                                                <OfferCreateModal lead={lead} />
+                                            </div>
+
+                                            {leadOffers.length === 0 ? (
+                                                <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-8 text-center text-slate-500">
+                                                    Henüz bu fırsat için bir teklif oluşturulmadı.
+                                                </div>
+                                            ) : (
+                                                <div className="grid grid-cols-1 gap-4">
+                                                    {leadOffers.map(offer => (
+                                                        <div key={offer.id} className="bg-white border hover:border-primary/30 transition-colors p-4 rounded-xl shadow-sm flex items-center justify-between">
+                                                            <div className="flex items-start gap-4">
+                                                                <div className="bg-primary/10 p-3 rounded-lg text-primary">
+                                                                    <FileText className="w-6 h-6" />
+                                                                </div>
+                                                                <div>
+                                                                    <div className="flex items-center gap-2 mb-1">
+                                                                        <h4 className="font-bold text-slate-800 text-sm">{offer.offer_no}</h4>
+                                                                        <Badge variant="outline" className="text-[10px] h-5 rounded-sm capitalize">
+                                                                            {offer.status}
+                                                                        </Badge>
+                                                                    </div>
+                                                                    <div className="flex text-xs text-slate-500 gap-4">
+                                                                        <span className="flex items-center"><Calendar className="w-3 h-3 mr-1" /> O: {new Date(offer.created_at || '').toLocaleDateString('tr-TR')}</span>
+                                                                        <span className="flex items-center text-orange-500"><Calendar className="w-3 h-3 mr-1" /> S: {offer.valid_until ? new Date(offer.valid_until).toLocaleDateString('tr-TR') : '-'}</span>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                            <div className="flex items-center gap-4">
+                                                                <div className="text-right">
+                                                                    <p className="text-xs text-slate-500">Net Tutar</p>
+                                                                    <p className="font-bold text-slate-800">{formatMoney(offer.final_price)}</p>
+                                                                </div>
+                                                                <Button
+                                                                    variant="outline"
+                                                                    size="sm"
+                                                                    className="gap-2 text-primary hover:text-primary border-primary/20 hover:bg-primary/5"
+                                                                    onClick={() => {
+                                                                        window.open(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api'}/offers/${offer.id}/pdf`, '_blank');
+                                                                    }}
+                                                                >
+                                                                    <Download className="w-4 h-4" />
+                                                                    PDF İndir
+                                                                </Button>
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
                                         </div>
                                     </TabsContent>
                                 </div>

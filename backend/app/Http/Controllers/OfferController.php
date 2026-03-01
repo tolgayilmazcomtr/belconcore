@@ -6,6 +6,7 @@ use App\Models\Offer;
 use App\Http\Resources\OfferResource;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
+use Barryvdh\DomPDF\Facade\Pdf;
 
 class OfferController extends Controller
 {
@@ -72,6 +73,17 @@ class OfferController extends Controller
         $offer->load(['customer', 'lead', 'unit', 'creator']);
 
         return new OfferResource($offer);
+    }
+
+    public function generatePdf(Request $request, Offer $offer)
+    {
+        $offer->load(['customer', 'lead', 'unit.block', 'creator', 'project']);
+
+        $pdf = Pdf::loadView('pdf.offer_template', compact('offer'));
+
+        $pdf->setPaper('A4', 'portrait');
+
+        return $pdf->download("Teklif_{$offer->offer_no}.pdf");
     }
 
     public function destroy(Offer $offer)

@@ -36,6 +36,8 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::put('leads/{lead}/status', [LeadController::class, 'updateStatus']);
         Route::apiResource('leads', LeadController::class);
         Route::apiResource('activities', ActivityController::class);
+        
+        Route::get('offers/{offer}/pdf', [OfferController::class, 'generatePdf']);
         Route::apiResource('offers', OfferController::class);
     });
 });
