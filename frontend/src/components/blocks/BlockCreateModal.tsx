@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
@@ -26,7 +26,8 @@ import {
 } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
-import { Plus, Loader2 } from "lucide-react"
+import { Plus, Loader2, Edit2 } from "lucide-react"
+import { Block } from "@/types/project.types"
 
 const formSchema = z.object({
     name: z.string().min(2, "Blok adı en az 2 karakter olmalıdır"),
@@ -34,10 +35,16 @@ const formSchema = z.object({
     parcel_island: z.string().optional(),
 })
 
-export function BlockCreateModal() {
+interface BlockCreateModalProps {
+    editBlock?: Block;
+    trigger?: React.ReactNode;
+}
+
+export function BlockCreateModal({ editBlock, trigger }: BlockCreateModalProps) {
     const [open, setOpen] = useState(false)
     const [loading, setLoading] = useState(false)
     const { activeProject, blocks, setBlocks } = useProjectStore()
+    const isEditing = !!editBlock;
 
     const form = useForm<z.infer<typeof formSchema>>({
         resolver: zodResolver(formSchema),
@@ -47,6 +54,24 @@ export function BlockCreateModal() {
             parcel_island: "",
         },
     })
+
+    useEffect(() => {
+        if (open) {
+            if (editBlock) {
+                form.reset({
+                    name: editBlock.name || "",
+                    code: editBlock.code || "",
+                    parcel_island: editBlock.parcel_island || "",
+                })
+            } else {
+                form.reset({
+                    name: "",
+                    code: "",
+                    parcel_island: "",
+                })
+            }
+        }
+    }, [open, editBlock, form])
 
     async function onSubmit(values: z.infer<typeof formSchema>) {
         if (!activeProject) {
@@ -64,24 +89,24 @@ export function BlockCreateModal() {
             if (values.code) payload.code = values.code;
             if (values.parcel_island) payload.parcel_island = values.parcel_island;
 
-            const response = await api.post("/blocks", payload)
+            let returnedBlock: Block;
 
-            // Zustand state güncellemesi
-            if (response.data && response.data.data) {
-                setBlocks([response.data.data, ...blocks])
+            if (isEditing) {
+                const response = await api.put(`/blocks/${editBlock.id}`, payload);
+                returnedBlock = response.data?.data || response.data;
+                setBlocks(blocks.map(b => b.id === returnedBlock.id ? returnedBlock : b));
+                toast.success("Güncellendi", { description: "Blok başarıyla güncellendi." });
+            } else {
+                const response = await api.post("/blocks", payload);
+                returnedBlock = response.data?.data || response.data;
+                setBlocks([returnedBlock, ...blocks]);
+                toast.success("Oluşturuldu", { description: "Yeni blok başarıyla oluşturuldu." });
             }
 
-            toast.success("Mükemmel!", {
-                description: "Yeni blok başarıyla oluşturuldu.",
-            })
-
             setOpen(false)
-            form.reset()
-        } catch (error) {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const err = error as any;
+        } catch (error: any) {
             toast.error("Hata", {
-                description: err.response?.data?.message || "Blok oluşturulurken bir hata meydana geldi.",
+                description: error.response?.data?.message || "İşlem sırasında bir hata oluştu.",
             })
         } finally {
             setLoading(false)
@@ -91,15 +116,19 @@ export function BlockCreateModal() {
     return (
         <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
-                <Button className="bg-primary hover:bg-primary/90 shadow-sm h-8 px-3">
-                    <Plus className="mr-1.5 h-4 w-4" /> Yeni Blok
-                </Button>
+                {trigger ? trigger : (
+                    <Button className="bg-primary hover:bg-primary/90 shadow-sm h-8 px-3">
+                        {isEditing ? <Edit2 className="mr-1.5 h-4 w-4" /> : <Plus className="mr-1.5 h-4 w-4" />}
+                        {isEditing ? 'Düzenle' : 'Yeni Blok'}
+                    </Button>
+                )}
             </DialogTrigger>
             <DialogContent className="sm:max-w-[600px]">
                 <DialogHeader>
-                    <DialogTitle>Yeni Blok Ekle</DialogTitle>
+                    <DialogTitle>{isEditing ? 'Blok Düzenle' : 'Yeni Blok Ekle'}</DialogTitle>
                     <DialogDescription>
-                        <strong>{activeProject?.name}</strong> projesine yeni bir blok/bina tanımlayın.
+                        {isEditing ? 'Seçili blok bilgilerini güncelleyin.' : <strong>{activeProject?.name}</strong>}
+                        {!isEditing && ' projesine yeni bir blok/bina tanımlayın.'}
                     </DialogDescription>
                 </DialogHeader>
 
@@ -153,7 +182,7 @@ export function BlockCreateModal() {
                             </Button>
                             <Button type="submit" disabled={loading}>
                                 {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                Kaydet
+                                {isEditing ? 'Güncelle' : 'Kaydet'}
                             </Button>
                         </div>
                     </form>

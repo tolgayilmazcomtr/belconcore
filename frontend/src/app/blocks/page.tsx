@@ -55,7 +55,7 @@ export default function BlocksPage() {
     }
 
     return (
-        <div className="flex-1 space-y-0 bg-[#f0f2f5] h-full flex flex-col p-6 gap-6">
+        <div className="flex h-full flex-col gap-6 p-6">
             {/* Odoo Style Control Panel */}
             <div className="flex items-center justify-between">
                 <div>
@@ -71,9 +71,9 @@ export default function BlocksPage() {
                 </div>
             </div>
 
-            <div className="flex-1 w-full relative min-h-0 h-full pb-6">
+            <div className="flex-1 rounded-lg border bg-background shadow-sm overflow-hidden">
                 {loading ? (
-                    <div className="flex items-center justify-center bg-white rounded-md border h-full w-full">
+                    <div className="flex items-center justify-center bg-white h-full w-full">
                         <span className="text-slate-500">Bloklar Yükleniyor...</span>
                     </div>
                 ) : (

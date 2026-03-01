@@ -12,7 +12,7 @@ import {
 } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Download, ChevronsUpDown, Search, MoreHorizontal } from 'lucide-react';
+import { Download, ChevronsUpDown, Search, MoreHorizontal, Edit2, Trash2 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import {
     useReactTable,
@@ -24,13 +24,24 @@ import {
     ColumnDef,
     FilterFn
 } from '@tanstack/react-table';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { BlockCreateModal } from './BlockCreateModal';
+import api from '@/lib/api';
+import { toast } from 'sonner';
+import { useProjectStore } from '@/store/useProjectStore';
 
 interface BlockListProps {
     blocks: Block[];
     projectName: string;
 }
 
-// Custom text filter that searches multiple columns
 const multiColumnFilterFn: FilterFn<Block> = (row, columnId, value, addMeta) => {
     const searchStr = value.toLowerCase();
     const name = (row.getValue('name') as string)?.toLowerCase() || '';
@@ -43,9 +54,16 @@ const multiColumnFilterFn: FilterFn<Block> = (row, columnId, value, addMeta) => 
 export function BlockList({ blocks, projectName }: BlockListProps) {
     const [sorting, setSorting] = useState<SortingState>([]);
     const [globalFilter, setGlobalFilter] = useState('');
+    const [rowSelection, setRowSelection] = useState({});
+    const { setBlocks, activeProject } = useProjectStore();
 
     const handleExport = () => {
-        const exportData = blocks.map(b => ({
+        const selectedRows = table.getFilteredSelectedRowModel().rows;
+        const rowsToExport = selectedRows.length > 0
+            ? selectedRows.map(r => r.original)
+            : table.getFilteredRowModel().rows.map(r => r.original);
+
+        const exportData = rowsToExport.map(b => ({
             'Blok Kodu': b.code || '-',
             'Blok Adı': b.name,
             'Parsel / Ada': b.parcel_island || '-',
@@ -58,11 +76,38 @@ export function BlockList({ blocks, projectName }: BlockListProps) {
         XLSX.writeFile(wb, `${projectName}_Bloklar_${new Date().toISOString().split('T')[0]}.xlsx`);
     };
 
+    const handleDelete = async (blockId: number) => {
+        if (!confirm("Bunu silmek istediğinize emin misiniz? Bu işlem geri alınamaz.")) return;
+        try {
+            await api.delete(`/blocks/${blockId}`);
+            setBlocks(blocks.filter(b => b.id !== blockId));
+            toast.success("Silindi", { description: "Blok başarıyla silindi." });
+        } catch (error: any) {
+            toast.error("Hata", { description: error.response?.data?.message || "Silinirken bir hata oluştu." });
+        }
+    };
+
     const columns = useMemo<ColumnDef<Block>[]>(() => [
         {
             id: 'select',
-            header: () => <input type="checkbox" className="rounded border-slate-300" />,
-            cell: () => <input type="checkbox" className="rounded border-slate-300 opacity-0 group-hover:opacity-100 transition-opacity" />,
+            header: ({ table }) => (
+                <input
+                    type="checkbox"
+                    className="rounded border-slate-300 w-4 h-4 cursor-pointer"
+                    checked={table.getIsAllPageRowsSelected()}
+                    onChange={table.getToggleAllPageRowsSelectedHandler()}
+                />
+            ),
+            cell: ({ row }) => (
+                <div onClick={(e) => e.stopPropagation()}>
+                    <input
+                        type="checkbox"
+                        className="rounded border-slate-300 w-4 h-4 cursor-pointer"
+                        checked={row.getIsSelected()}
+                        onChange={row.getToggleSelectedHandler()}
+                    />
+                </div>
+            ),
             size: 40,
         },
         {
@@ -112,16 +157,41 @@ export function BlockList({ blocks, projectName }: BlockListProps) {
         },
         {
             id: 'actions',
-            cell: () => (
-                <div className="flex justify-end">
-                    <Button variant="ghost" size="icon" className="h-6 w-6 text-slate-400 hover:text-primary opacity-0 group-hover:opacity-100 transition-opacity">
-                        <MoreHorizontal className="h-4 w-4" />
-                    </Button>
-                </div>
-            ),
+            cell: ({ row }) => {
+                const block = row.original;
+                return (
+                    <div className="flex justify-end" onClick={(e) => e.stopPropagation()}>
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-primary">
+                                    <span className="sr-only">Menüyü aç</span>
+                                    <MoreHorizontal className="h-4 w-4" />
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-48">
+                                <DropdownMenuLabel>İşlemler</DropdownMenuLabel>
+                                <DropdownMenuSeparator />
+                                <BlockCreateModal
+                                    editBlock={block}
+                                    trigger={
+                                        <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="cursor-pointer">
+                                            <Edit2 className="mr-2 h-4 w-4" />
+                                            <span>Düzenle</span>
+                                        </DropdownMenuItem>
+                                    }
+                                />
+                                <DropdownMenuItem onClick={() => handleDelete(block.id)} className="text-red-600 focus:bg-red-50 focus:text-red-700 cursor-pointer">
+                                    <Trash2 className="mr-2 h-4 w-4" />
+                                    <span>Sil</span>
+                                </DropdownMenuItem>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+                    </div>
+                )
+            },
             size: 50,
         }
-    ], []);
+    ], [blocks, setBlocks]);
 
     const table = useReactTable({
         data: blocks,
@@ -132,15 +202,17 @@ export function BlockList({ blocks, projectName }: BlockListProps) {
         onGlobalFilterChange: setGlobalFilter,
         globalFilterFn: multiColumnFilterFn,
         getFilteredRowModel: getFilteredRowModel(),
+        enableRowSelection: true,
+        onRowSelectionChange: setRowSelection,
         state: {
             sorting,
             globalFilter,
+            rowSelection,
         },
     });
 
     return (
         <div className="flex flex-col h-full bg-white rounded-md shadow-sm border overflow-hidden">
-            {/* Control Panel */}
             <div className="flex items-center justify-between p-3 border-b bg-slate-50/50">
                 <div className="relative group w-72">
                     <Search className="absolute left-2.5 top-2 h-4 w-4 text-slate-400" />

@@ -27,7 +27,8 @@ import {
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Plus, Loader2 } from "lucide-react"
+import { Plus, Loader2, Edit2 } from "lucide-react"
+import { Unit } from "@/types/project.types"
 
 const formSchema = z.object({
     block_id: z.string().optional(),
@@ -40,10 +41,16 @@ const formSchema = z.object({
     list_price: z.string().optional(),
 })
 
-export function UnitCreateModal() {
+interface UnitCreateModalProps {
+    editUnit?: Unit;
+    trigger?: React.ReactNode;
+}
+
+export function UnitCreateModal({ editUnit, trigger }: UnitCreateModalProps) {
     const [open, setOpen] = useState(false)
     const [loading, setLoading] = useState(false)
     const { activeProject, units, setUnits, blocks, setBlocks } = useProjectStore()
+    const isEditing = !!editUnit;
 
     // Yükleme sırasında blokları çek
     useEffect(() => {
@@ -68,6 +75,34 @@ export function UnitCreateModal() {
         },
     })
 
+    useEffect(() => {
+        if (open) {
+            if (editUnit) {
+                form.reset({
+                    block_id: editUnit.block_id ? editUnit.block_id.toString() : "none",
+                    unit_no: editUnit.unit_no || "",
+                    floor_no: editUnit.floor_no || "",
+                    unit_type: editUnit.unit_type || "",
+                    gross_area: editUnit.gross_area ? editUnit.gross_area.toString() : "",
+                    net_area: editUnit.net_area ? editUnit.net_area.toString() : "",
+                    status: (editUnit.status as any) || "available",
+                    list_price: editUnit.list_price ? editUnit.list_price.toString() : "",
+                })
+            } else {
+                form.reset({
+                    block_id: "none",
+                    unit_no: "",
+                    floor_no: "",
+                    unit_type: "",
+                    gross_area: "",
+                    net_area: "",
+                    status: "available",
+                    list_price: "",
+                })
+            }
+        }
+    }, [open, editUnit, form])
+
     async function onSubmit(values: z.infer<typeof formSchema>) {
         if (!activeProject) {
             toast.error("Hata", { description: "Lütfen önce bir proje seçin." })
@@ -89,28 +124,30 @@ export function UnitCreateModal() {
             if (values.net_area) payload.net_area = parseFloat(values.net_area);
             if (values.list_price) payload.list_price = parseFloat(values.list_price);
 
-            const response = await api.post("/units", payload)
+            let returnedUnit: Unit;
 
-            // Modeli liste üzerine ekle (with('block') API'den geldiği için relation içerecektir)
-            if (response.data && response.data.data) {
-                // Fetch the block relation manually if it is not returned (UnitController store currently does not return block relation)
-                // Actually it may just return block_id. We can append it directly, but for precise table display, let's fetch it from store if needed
-                const newUnit = response.data.data;
-                if (!newUnit.block && newUnit.block_id) {
-                    newUnit.block = blocks.find(b => b.id === newUnit.block_id);
+            if (isEditing) {
+                const response = await api.put(`/units/${editUnit.id}`, payload);
+                returnedUnit = response.data?.data || response.data;
+                if (!returnedUnit.block && returnedUnit.block_id) {
+                    returnedUnit.block = blocks.find(b => b.id === returnedUnit.block_id);
                 }
-                setUnits([newUnit, ...units])
+                setUnits(units.map(u => u.id === returnedUnit.id ? returnedUnit : u));
+                toast.success("Güncellendi", { description: "Ünite başarıyla güncellendi." });
+            } else {
+                const response = await api.post("/units", payload);
+                returnedUnit = response.data?.data || response.data;
+                if (!returnedUnit.block && returnedUnit.block_id) {
+                    returnedUnit.block = blocks.find(b => b.id === returnedUnit.block_id);
+                }
+                setUnits([returnedUnit, ...units]);
+                toast.success("Oluşturuldu", { description: "Yeni ünite başarıyla oluşturuldu." });
             }
 
-            toast.success("Mükemmel!", {
-                description: "Yeni ünite başarıyla oluşturuldu.",
-            })
-
             setOpen(false)
-            form.reset()
         } catch (error: any) {
             toast.error("Hata", {
-                description: error.response?.data?.message || "Ünite oluşturulurken bir hata meydana geldi.",
+                description: error.response?.data?.message || "İşlem sırasında bir hata oluştu.",
             })
         } finally {
             setLoading(false)
@@ -120,15 +157,19 @@ export function UnitCreateModal() {
     return (
         <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
-                <Button className="bg-primary hover:bg-primary/90 shadow-sm h-8 px-3">
-                    <Plus className="mr-1.5 h-4 w-4" /> Yeni Ünite
-                </Button>
+                {trigger ? trigger : (
+                    <Button className="bg-primary hover:bg-primary/90 shadow-sm h-8 px-3">
+                        {isEditing ? <Edit2 className="mr-1.5 h-4 w-4" /> : <Plus className="mr-1.5 h-4 w-4" />}
+                        {isEditing ? 'Düzenle' : 'Yeni Ünite'}
+                    </Button>
+                )}
             </DialogTrigger>
             <DialogContent className="sm:max-w-[600px]">
                 <DialogHeader>
-                    <DialogTitle>Yeni Ünite Ekle</DialogTitle>
+                    <DialogTitle>{isEditing ? 'Ünite Düzenle' : 'Yeni Ünite Ekle'}</DialogTitle>
                     <DialogDescription>
-                        <strong>{activeProject?.name}</strong> projesine yeni bir bağımsız bölüm (daire/dükkan) tanımlayın.
+                        {isEditing ? 'Seçili ünite bilgilerini güncelleyin.' : <strong>{activeProject?.name}</strong>}
+                        {!isEditing && ' projesine yeni bir bağımsız bölüm (daire/dükkan) tanımlayın.'}
                     </DialogDescription>
                 </DialogHeader>
 
@@ -142,7 +183,7 @@ export function UnitCreateModal() {
                                 render={({ field }) => (
                                     <FormItem>
                                         <FormLabel>Bağlı Blok (Opsiyonel)</FormLabel>
-                                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                        <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
                                             <FormControl>
                                                 <SelectTrigger>
                                                     <SelectValue placeholder="Blok Seçin" />
@@ -166,7 +207,7 @@ export function UnitCreateModal() {
                                 render={({ field }) => (
                                     <FormItem>
                                         <FormLabel>Durum</FormLabel>
-                                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                        <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
                                             <FormControl>
                                                 <SelectTrigger>
                                                     <SelectValue placeholder="Durum Seçin" />
@@ -281,7 +322,7 @@ export function UnitCreateModal() {
                             </Button>
                             <Button type="submit" disabled={loading}>
                                 {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                Kaydet
+                                {isEditing ? 'Güncelle' : 'Kaydet'}
                             </Button>
                         </div>
                     </form>

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
@@ -26,7 +26,8 @@ import {
 } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
-import { PlusCircle, Loader2 } from "lucide-react"
+import { PlusCircle, Loader2, Edit2 } from "lucide-react"
+import { Project } from "@/types/project.types"
 
 const formSchema = z.object({
     name: z.string().min(2, "Proje adı en az 2 karakter olmalıdır"),
@@ -36,10 +37,16 @@ const formSchema = z.object({
     planned_budget: z.string().optional(),
 })
 
-export function ProjectCreateModal() {
+interface ProjectCreateModalProps {
+    editProject?: Project;
+    trigger?: React.ReactNode;
+}
+
+export function ProjectCreateModal({ editProject, trigger }: ProjectCreateModalProps) {
     const [open, setOpen] = useState(false)
     const [loading, setLoading] = useState(false)
     const { projects, setProjects } = useProjectStore()
+    const isEditing = !!editProject;
 
     const form = useForm<z.infer<typeof formSchema>>({
         resolver: zodResolver(formSchema),
@@ -51,6 +58,28 @@ export function ProjectCreateModal() {
             planned_budget: "",
         },
     })
+
+    useEffect(() => {
+        if (open) {
+            if (editProject) {
+                form.reset({
+                    name: editProject.name || "",
+                    code: editProject.code || "",
+                    start_date: editProject.start_date || "",
+                    end_date: editProject.end_date || "",
+                    planned_budget: editProject.planned_budget ? editProject.planned_budget.toString() : "",
+                })
+            } else {
+                form.reset({
+                    name: "",
+                    code: "",
+                    start_date: "",
+                    end_date: "",
+                    planned_budget: "",
+                })
+            }
+        }
+    }, [open, editProject, form])
 
     async function onSubmit(values: z.infer<typeof formSchema>) {
         setLoading(true)
@@ -64,23 +93,23 @@ export function ProjectCreateModal() {
             if (values.end_date) payload.end_date = values.end_date;
             if (values.planned_budget) payload.planned_budget = parseFloat(values.planned_budget);
 
-            const response = await api.post("/projects", payload)
-
-            // Zustand state güncellemesi
-            if (response.data && response.data.data) {
-                setProjects([response.data.data, ...projects])
+            if (isEditing) {
+                const response = await api.put(`/projects/${editProject.id}`, payload);
+                const updatedProject = response.data?.data || response.data;
+                setProjects(projects.map(p => p.id === updatedProject.id ? updatedProject : p));
+                toast.success("Güncellendi", { description: "Proje başarıyla güncellendi." });
+            } else {
+                const response = await api.post("/projects", payload);
+                const newProject = response.data?.data || response.data;
+                setProjects([newProject, ...projects]);
+                toast.success("Oluşturuldu", { description: "Yeni proje başarıyla oluşturuldu." });
             }
 
-            toast.success("Mükemmel!", {
-                description: "Yeni proje başarıyla oluşturuldu.",
-            })
-
             setOpen(false)
-            form.reset()
         } catch (error: unknown) {
             const err = error as { response?: { data?: { message?: string } } };
             toast.error("Hata", {
-                description: err.response?.data?.message || "Proje oluşturulurken bir hata meydana geldi.",
+                description: err.response?.data?.message || "İşlem sırasında bir hata meydana geldi.",
             })
         } finally {
             setLoading(false)
@@ -90,15 +119,18 @@ export function ProjectCreateModal() {
     return (
         <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
-                <Button className="bg-primary hover:bg-primary/90">
-                    <PlusCircle className="mr-2 h-4 w-4" /> Yeni Proje
-                </Button>
+                {trigger ? trigger : (
+                    <Button className="bg-primary hover:bg-primary/90">
+                        {isEditing ? <Edit2 className="mr-2 h-4 w-4" /> : <PlusCircle className="mr-2 h-4 w-4" />}
+                        {isEditing ? 'Düzenle' : 'Yeni Proje'}
+                    </Button>
+                )}
             </DialogTrigger>
             <DialogContent className="sm:max-w-[600px]">
                 <DialogHeader>
-                    <DialogTitle>Yeni Proje Ekle</DialogTitle>
+                    <DialogTitle>{isEditing ? 'Proje Düzenle' : 'Yeni Proje Ekle'}</DialogTitle>
                     <DialogDescription>
-                        Sisteme yeni bir proje tanımlayın. Daha sonra proje içerisine Blok ve Üniteleri ekleyebilirsiniz.
+                        {isEditing ? 'Seçili proje bilgilerini güncelleyin.' : 'Sisteme yeni bir proje tanımlayın. Daha sonra proje içerisine Blok ve Üniteleri ekleyebilirsiniz.'}
                     </DialogDescription>
                 </DialogHeader>
 
@@ -181,7 +213,7 @@ export function ProjectCreateModal() {
                             </Button>
                             <Button type="submit" disabled={loading}>
                                 {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                Kaydet
+                                {isEditing ? 'Güncelle' : 'Kaydet'}
                             </Button>
                         </div>
                     </form>

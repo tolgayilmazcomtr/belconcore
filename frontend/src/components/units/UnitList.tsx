@@ -13,7 +13,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Download, ChevronsUpDown, Search, MoreHorizontal } from 'lucide-react';
+import { Download, ChevronsUpDown, Search, MoreHorizontal, Edit2, Trash2 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import {
     useReactTable,
@@ -25,13 +25,24 @@ import {
     ColumnDef,
     FilterFn
 } from '@tanstack/react-table';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { UnitCreateModal } from './UnitCreateModal';
+import api from '@/lib/api';
+import { toast } from 'sonner';
+import { useProjectStore } from '@/store/useProjectStore';
 
 interface UnitListProps {
     units: Unit[];
     projectName: string;
 }
 
-// Custom text filter that searches multiple columns
 const multiColumnFilterFn: FilterFn<Unit> = (row, columnId, value, addMeta) => {
     const searchStr = value.toLowerCase();
     const unitNo = (row.getValue('unit_no') as string)?.toLowerCase() || '';
@@ -44,9 +55,16 @@ const multiColumnFilterFn: FilterFn<Unit> = (row, columnId, value, addMeta) => {
 export function UnitList({ units, projectName }: UnitListProps) {
     const [sorting, setSorting] = useState<SortingState>([]);
     const [globalFilter, setGlobalFilter] = useState('');
+    const [rowSelection, setRowSelection] = useState({});
+    const { setUnits } = useProjectStore();
 
     const handleExport = () => {
-        const exportData = units.map(u => ({
+        const selectedRows = table.getFilteredSelectedRowModel().rows;
+        const rowsToExport = selectedRows.length > 0
+            ? selectedRows.map(r => r.original)
+            : table.getFilteredRowModel().rows.map(r => r.original);
+
+        const exportData = rowsToExport.map(u => ({
             'Blok': u.block?.code || '-',
             'Bağımsız Bölüm No': u.unit_no,
             'Kat': u.floor_no || '-',
@@ -63,12 +81,23 @@ export function UnitList({ units, projectName }: UnitListProps) {
         XLSX.writeFile(wb, `${projectName}_Uniteler_${new Date().toISOString().split('T')[0]}.xlsx`);
     };
 
+    const handleDelete = async (unitId: number) => {
+        if (!confirm("Bu üniteyi silmek istediğinize emin misiniz? Bu işlem geri alınamaz.")) return;
+        try {
+            await api.delete(`/units/${unitId}`);
+            setUnits(units.filter(u => u.id !== unitId));
+            toast.success("Silindi", { description: "Ünite başarıyla silindi." });
+        } catch (error: any) {
+            toast.error("Hata", { description: error.response?.data?.message || "Silinirken bir hata oluştu." });
+        }
+    };
+
     const getStatusVariant = (status: string) => {
         switch (status) {
-            case 'available': return 'default'; // Satışa Uygun
-            case 'sold': return 'destructive'; // Satıldı
-            case 'reserved': return 'secondary'; // Rezerve
-            case 'not_for_sale': return 'outline'; // Satışa Kapalı
+            case 'available': return 'default';
+            case 'sold': return 'destructive';
+            case 'reserved': return 'secondary';
+            case 'not_for_sale': return 'outline';
             default: return 'outline';
         }
     };
@@ -86,12 +115,28 @@ export function UnitList({ units, projectName }: UnitListProps) {
     const columns = useMemo<ColumnDef<Unit>[]>(() => [
         {
             id: 'select',
-            header: () => <input type="checkbox" className="rounded border-slate-300" />,
-            cell: () => <input type="checkbox" className="rounded border-slate-300 opacity-0 group-hover:opacity-100 transition-opacity" />,
+            header: ({ table }) => (
+                <input
+                    type="checkbox"
+                    className="rounded border-slate-300 w-4 h-4 cursor-pointer"
+                    checked={table.getIsAllPageRowsSelected()}
+                    onChange={table.getToggleAllPageRowsSelectedHandler()}
+                />
+            ),
+            cell: ({ row }) => (
+                <div onClick={(e) => e.stopPropagation()}>
+                    <input
+                        type="checkbox"
+                        className="rounded border-slate-300 w-4 h-4 cursor-pointer"
+                        checked={row.getIsSelected()}
+                        onChange={row.getToggleSelectedHandler()}
+                    />
+                </div>
+            ),
             size: 40,
         },
         {
-            accessorKey: 'block_id', // We show block code via custom cell
+            accessorKey: 'block_id',
             header: ({ column }) => (
                 <Button variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === "asc")} className="h-8 p-0 text-xs font-semibold hover:bg-transparent">
                     BLOK
@@ -200,16 +245,41 @@ export function UnitList({ units, projectName }: UnitListProps) {
         },
         {
             id: 'actions',
-            cell: () => (
-                <div className="flex justify-end">
-                    <Button variant="ghost" size="icon" className="h-6 w-6 text-slate-400 hover:text-primary opacity-0 group-hover:opacity-100 transition-opacity">
-                        <MoreHorizontal className="h-4 w-4" />
-                    </Button>
-                </div>
-            ),
+            cell: ({ row }) => {
+                const unit = row.original;
+                return (
+                    <div className="flex justify-end" onClick={(e) => e.stopPropagation()}>
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-primary">
+                                    <span className="sr-only">Menüyü aç</span>
+                                    <MoreHorizontal className="h-4 w-4" />
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-48">
+                                <DropdownMenuLabel>İşlemler</DropdownMenuLabel>
+                                <DropdownMenuSeparator />
+                                <UnitCreateModal
+                                    editUnit={unit}
+                                    trigger={
+                                        <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="cursor-pointer">
+                                            <Edit2 className="mr-2 h-4 w-4" />
+                                            <span>Düzenle</span>
+                                        </DropdownMenuItem>
+                                    }
+                                />
+                                <DropdownMenuItem onClick={() => handleDelete(unit.id)} className="text-red-600 focus:bg-red-50 focus:text-red-700 cursor-pointer">
+                                    <Trash2 className="mr-2 h-4 w-4" />
+                                    <span>Sil</span>
+                                </DropdownMenuItem>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+                    </div>
+                )
+            },
             size: 40,
         }
-    ], []);
+    ], [units, setUnits]);
 
     const table = useReactTable({
         data: units,
@@ -220,15 +290,17 @@ export function UnitList({ units, projectName }: UnitListProps) {
         onGlobalFilterChange: setGlobalFilter,
         globalFilterFn: multiColumnFilterFn,
         getFilteredRowModel: getFilteredRowModel(),
+        enableRowSelection: true,
+        onRowSelectionChange: setRowSelection,
         state: {
             sorting,
             globalFilter,
+            rowSelection,
         },
     });
 
     return (
         <div className="flex flex-col h-full bg-white rounded-md shadow-sm border overflow-hidden">
-            {/* Control Panel */}
             <div className="flex items-center justify-between p-3 border-b bg-slate-50/50">
                 <div className="relative group w-[320px]">
                     <Search className="absolute left-2.5 top-2 h-4 w-4 text-slate-400" />

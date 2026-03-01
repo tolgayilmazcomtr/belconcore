@@ -13,7 +13,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Download, ChevronsUpDown, Search } from 'lucide-react';
+import { Download, ChevronsUpDown, Search, MoreHorizontal, Edit2, Trash2 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import {
     useReactTable,
@@ -24,6 +24,18 @@ import {
     SortingState,
     ColumnDef
 } from '@tanstack/react-table';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { ProjectCreateModal } from './ProjectCreateModal';
+import api from '@/lib/api';
+import { toast } from 'sonner';
+import { useProjectStore } from '@/store/useProjectStore';
 
 interface ProjectListProps {
     projects: Project[];
@@ -33,9 +45,16 @@ interface ProjectListProps {
 export function ProjectList({ projects, onRowClick }: ProjectListProps) {
     const [sorting, setSorting] = useState<SortingState>([]);
     const [globalFilter, setGlobalFilter] = useState('');
+    const [rowSelection, setRowSelection] = useState({});
+    const { setProjects } = useProjectStore();
 
     const handleExport = () => {
-        const exportData = projects.map(p => ({
+        const selectedRows = table.getFilteredSelectedRowModel().rows;
+        const rowsToExport = selectedRows.length > 0
+            ? selectedRows.map(r => r.original)
+            : table.getFilteredRowModel().rows.map(r => r.original);
+
+        const exportData = rowsToExport.map(p => ({
             'Kod': p.code || '-',
             'Proje Adı': p.name,
             'Durum': getStatusLabel(p.status),
@@ -49,6 +68,17 @@ export function ProjectList({ projects, onRowClick }: ProjectListProps) {
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, "Projeler");
         XLSX.writeFile(wb, `Projeler_${new Date().toISOString().split('T')[0]}.xlsx`);
+    };
+
+    const handleDelete = async (projectId: number) => {
+        if (!confirm("Bunu silmek istediğinize emin misiniz? Bu işlem geri alınamaz.")) return;
+        try {
+            await api.delete(`/projects/${projectId}`);
+            setProjects(projects.filter(p => p.id !== projectId));
+            toast.success("Silindi", { description: "Proje başarıyla silindi." });
+        } catch (error: any) {
+            toast.error("Hata", { description: error.response?.data?.message || "Silinirken bir hata oluştu." });
+        }
     };
 
     const getStatusVariant = (status: string) => {
@@ -70,6 +100,28 @@ export function ProjectList({ projects, onRowClick }: ProjectListProps) {
     };
 
     const columns = useMemo<ColumnDef<Project>[]>(() => [
+        {
+            id: 'select',
+            header: ({ table }) => (
+                <input
+                    type="checkbox"
+                    className="rounded border-slate-300 w-4 h-4 cursor-pointer"
+                    checked={table.getIsAllPageRowsSelected()}
+                    onChange={table.getToggleAllPageRowsSelectedHandler()}
+                />
+            ),
+            cell: ({ row }) => (
+                <div onClick={(e) => e.stopPropagation()}>
+                    <input
+                        type="checkbox"
+                        className="rounded border-slate-300 w-4 h-4 cursor-pointer"
+                        checked={row.getIsSelected()}
+                        onChange={row.getToggleSelectedHandler()}
+                    />
+                </div>
+            ),
+            size: 40,
+        },
         {
             accessorKey: 'code',
             header: ({ column }) => {
@@ -141,7 +193,43 @@ export function ProjectList({ projects, onRowClick }: ProjectListProps) {
                 return <div className="text-right font-medium pr-2 text-slate-700">{formatted}</div>
             },
         },
-    ], []);
+        {
+            id: 'actions',
+            cell: ({ row }) => {
+                const project = row.original;
+                return (
+                    <div className="flex justify-end pr-3" onClick={(e) => e.stopPropagation()}>
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-primary">
+                                    <span className="sr-only">Menüyü aç</span>
+                                    <MoreHorizontal className="h-4 w-4" />
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-48">
+                                <DropdownMenuLabel>İşlemler</DropdownMenuLabel>
+                                <DropdownMenuSeparator />
+                                <ProjectCreateModal
+                                    editProject={project}
+                                    trigger={
+                                        <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="cursor-pointer">
+                                            <Edit2 className="mr-2 h-4 w-4" />
+                                            <span>Düzenle</span>
+                                        </DropdownMenuItem>
+                                    }
+                                />
+                                <DropdownMenuItem onClick={() => handleDelete(project.id)} className="text-red-600 focus:bg-red-50 focus:text-red-700 cursor-pointer">
+                                    <Trash2 className="mr-2 h-4 w-4" />
+                                    <span>Sil</span>
+                                </DropdownMenuItem>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+                    </div>
+                )
+            },
+            size: 50,
+        }
+    ], [projects, setProjects]);
 
     const table = useReactTable({
         data: projects,
@@ -151,9 +239,12 @@ export function ProjectList({ projects, onRowClick }: ProjectListProps) {
         getSortedRowModel: getSortedRowModel(),
         onGlobalFilterChange: setGlobalFilter,
         getFilteredRowModel: getFilteredRowModel(),
+        enableRowSelection: true,
+        onRowSelectionChange: setRowSelection,
         state: {
             sorting,
             globalFilter,
+            rowSelection,
         },
     });
 
