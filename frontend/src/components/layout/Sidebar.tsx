@@ -64,12 +64,12 @@ export function Sidebar() {
           icon={<Users size={20} className="shrink-0" />}
           label="CRM & Satış"
           collapsed={collapsed}
-          activePaths={["/customers", "/crm"]}
+          activePaths={["/customers", "/crm", "/offers"]}
         >
           <SidebarSubItem icon={<Users size={16} />} label="Müşteriler" href="/customers" collapsed={collapsed} />
           <SidebarSubItem icon={<PieChart size={16} />} label="Fırsatlar" href="/crm" collapsed={collapsed} />
+          <SidebarSubItem icon={<FileText size={16} />} label="Teklifler" href="/offers" collapsed={collapsed} />
         </SidebarExpandableItem>
-        <SidebarItem icon={<FileText size={20} className="shrink-0" />} label="Teklifler" href="/offers" collapsed={collapsed} />
         <SidebarItem icon={<WalletCards size={20} className="shrink-0" />} label="Ön Muhasebe" href="/accounting" collapsed={collapsed} />
         <SidebarItem icon={<Warehouse size={20} className="shrink-0" />} label="Stok & Maliyet" href="/inventory" collapsed={collapsed} />
         <SidebarItem icon={<HardHat size={20} className="shrink-0" />} label="Şantiye İlerleme" href="/site-progress" collapsed={collapsed} />
