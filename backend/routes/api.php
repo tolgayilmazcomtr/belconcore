@@ -14,6 +14,7 @@ use App\Http\Controllers\TemplateConfigController;
 use App\Http\Controllers\AccountingAccountController;
 use App\Http\Controllers\InvoiceController;
 use App\Http\Controllers\AccountingPaymentController;
+use App\Http\Controllers\FinanceAccountController;
 
 // Public Auth Routes
 Route::post('/login', [AuthController::class, 'login']);
@@ -53,6 +54,16 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('accounting/payments', [AccountingPaymentController::class, 'index']);
         Route::post('accounting/payments', [AccountingPaymentController::class, 'store']);
         Route::delete('accounting/payments/{id}', [AccountingPaymentController::class, 'destroy']);
+
+        // Finans – Kasa & Bankalar
+        Route::get('finance/accounts',                        [FinanceAccountController::class, 'indexAccounts']);
+        Route::post('finance/accounts',                       [FinanceAccountController::class, 'storeAccount']);
+        Route::put('finance/accounts/{account}',              [FinanceAccountController::class, 'updateAccount']);
+        Route::delete('finance/accounts/{account}',           [FinanceAccountController::class, 'destroyAccount']);
+        Route::get('finance/summary',                         [FinanceAccountController::class, 'summary']);
+        Route::get('finance/transactions',                    [FinanceAccountController::class, 'indexTransactions']);
+        Route::post('finance/transactions',                   [FinanceAccountController::class, 'storeTransaction']);
+        Route::delete('finance/transactions/{transaction}',   [FinanceAccountController::class, 'destroyTransaction']);
         });
 
     // Şablon Editörü
