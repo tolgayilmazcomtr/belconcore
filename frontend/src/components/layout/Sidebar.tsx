@@ -1,177 +1,305 @@
-"use client"
+"use client";
 
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
-import { useState, useEffect } from "react";
-import {
-  LayoutDashboard,
-  Users,
-  Building2,
-  FileText,
-  WalletCards,
-  Warehouse,
-  HardHat,
-  PieChart,
-  ChevronLeft,
-  ChevronRight,
-  ChevronDown,
-  Building,
-  Home,
-  Settings2,
-  LayoutTemplate,
-} from "lucide-react";
 import { usePathname } from "next/navigation";
+import {
+  LayoutDashboard, Building2, Users, FileText, WalletCards,
+  Warehouse, HardHat, PieChart, Settings2, LayoutTemplate,
+  Building, Home, ChevronDown, TrendingUp, TrendingDown,
+  Landmark, FileCheck, BarChart2, Calendar, Wallet,
+  FileBarChart, Receipt, ShoppingCart, ShoppingBag,
+  Menu, X
+} from "lucide-react";
 
-export function Sidebar() {
-  const [collapsed, setCollapsed] = useState(false);
-  const pathname = usePathname();
-
-  if (pathname === "/login") {
-    return null; // Hide Sidebar on login page
-  }
-
-  return (
-    <aside className={`${collapsed ? 'w-16' : 'w-64'} bg-[#f8f9fa] border-r border-border min-h-screen flex flex-col transition-all duration-300 relative group`}>
-      <div className="h-14 flex items-center justify-center border-b border-border bg-white px-2 overflow-hidden shrink-0">
-        <Link href="/" className="flex items-center justify-center w-full">
-          {collapsed ? (
-            <img src="/favicon.png" alt="B" className="h-8 max-w-[32px] object-contain transition-all" />
-          ) : (
-            <img src="/logo.png" alt="BelconCORE" className="h-8 max-w-[150px] object-contain transition-all" />
-          )}
-        </Link>
-      </div>
-
-      <button
-        onClick={() => setCollapsed(!collapsed)}
-        className="absolute -right-3 top-16 bg-white border border-border rounded-full p-1 text-slate-500 hover:text-primary hover:border-primary shadow-sm z-10 transition-colors"
-      >
-        {collapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
-      </button>
-
-      <nav className={`flex-1 overflow-y-auto overflow-x-hidden ${collapsed ? 'px-2 py-4 space-y-2' : 'px-3 py-4 space-y-1'}`}>
-        <SidebarItem icon={<LayoutDashboard size={20} className="shrink-0" />} label="Dashboard" href="/" collapsed={collapsed} />
-
-        <SidebarExpandableItem
-          icon={<Building2 size={20} className="shrink-0" />}
-          label="Proje Yönetimi"
-          collapsed={collapsed}
-          activePaths={["/projects", "/blocks", "/units"]}
-        >
-          <SidebarSubItem icon={<Building2 size={16} />} label="Tüm Projeler" href="/projects" collapsed={collapsed} />
-          <SidebarSubItem icon={<Building size={16} />} label="Bloklar / Binalar" href="/blocks" collapsed={collapsed} />
-          <SidebarSubItem icon={<Home size={16} />} label="Üniteler / Daireler" href="/units" collapsed={collapsed} />
-        </SidebarExpandableItem>
-
-        <SidebarExpandableItem
-          icon={<Users size={20} className="shrink-0" />}
-          label="CRM & Satış"
-          collapsed={collapsed}
-          activePaths={["/customers", "/crm", "/offers"]}
-        >
-          <SidebarSubItem icon={<Users size={16} />} label="Müşteriler" href="/customers" collapsed={collapsed} />
-          <SidebarSubItem icon={<PieChart size={16} />} label="Fırsatlar" href="/crm" collapsed={collapsed} />
-          <SidebarSubItem icon={<FileText size={16} />} label="Teklifler" href="/offers" collapsed={collapsed} />
-        </SidebarExpandableItem>
-        <SidebarExpandableItem
-          icon={<WalletCards size={20} className="shrink-0" />}
-          label="Muhasebe"
-          collapsed={collapsed}
-          activePaths={["/accounting"]}
-        >
-          <SidebarSubItem icon={<Users size={16} />} label="Cariler" href="/accounting/accounts" collapsed={collapsed} />
-          <SidebarSubItem icon={<FileText size={16} />} label="Satışlar" href="/accounting/sales" collapsed={collapsed} />
-          <SidebarSubItem icon={<FileText size={16} />} label="Alışlar" href="/accounting/purchases" collapsed={collapsed} />
-          <SidebarSubItem icon={<WalletCards size={16} />} label="Kasa ve Bankalar" href="/accounting/finance" collapsed={collapsed} />
-        </SidebarExpandableItem>
-        <SidebarItem icon={<Warehouse size={20} className="shrink-0" />} label="Stok & Maliyet" href="/inventory" collapsed={collapsed} />
-        <SidebarItem icon={<HardHat size={20} className="shrink-0" />} label="Şantiye İlerleme" href="/site-progress" collapsed={collapsed} />
-        <SidebarItem icon={<PieChart size={20} className="shrink-0" />} label="Raporlar" href="/reports" collapsed={collapsed} />
-
-        <SidebarExpandableItem
-          icon={<Settings2 size={20} className="shrink-0" />}
-          label="Sistem Ayarları"
-          collapsed={collapsed}
-          activePaths={["/settings"]}
-        >
-          <SidebarSubItem icon={<LayoutTemplate size={16} />} label="Şablon Editörü" href="/settings/templates" collapsed={collapsed} />
-        </SidebarExpandableItem>
-      </nav>
-
-      <div className={`p-4 border-t border-sidebar-border text-xs text-muted-foreground whitespace-nowrap overflow-hidden transition-all ${collapsed ? 'text-center opacity-0 h-0 hidden' : 'text-center opacity-100'}`}>
-        &copy; {new Date().getFullYear()} Belcon
-      </div>
-    </aside>
-  );
+// ─── Types ───────────────────────────────────────────────────────────────────
+interface NavChild {
+  label: string;
+  href: string;
+  icon?: React.ReactNode;
 }
 
-function SidebarItem({ icon, label, href, collapsed }: { icon: React.ReactNode; label: string; href: string; collapsed: boolean }) {
+interface NavSection {
+  kind: "section";
+  label: string;
+  items: NavChild[];
+}
+
+interface NavItem {
+  kind: "item";
+  label: string;
+  href: string;
+  icon: React.ReactNode;
+  exact?: boolean;
+  children?: (NavChild | NavSection)[];
+}
+
+type NavEntry = NavItem;
+
+// ─── Navigation Config ────────────────────────────────────────────────────────
+const NAV: NavEntry[] = [
+  {
+    kind: "item",
+    label: "Dashboard",
+    href: "/",
+    icon: <LayoutDashboard size={16} />,
+    exact: true,
+  },
+  {
+    kind: "item",
+    label: "Proje Yönetimi",
+    href: "/projects",
+    icon: <Building2 size={16} />,
+    children: [
+      { label: "Tüm Projeler", href: "/projects", icon: <Building2 size={13} /> },
+      { label: "Bloklar / Binalar", href: "/blocks", icon: <Building size={13} /> },
+      { label: "Üniteler / Daireler", href: "/units", icon: <Home size={13} /> },
+    ],
+  },
+  {
+    kind: "item",
+    label: "CRM & Satış",
+    href: "/crm",
+    icon: <Users size={16} />,
+    children: [
+      { label: "Müşteriler", href: "/customers", icon: <Users size={13} /> },
+      { label: "Fırsatlar", href: "/crm", icon: <PieChart size={13} /> },
+      { label: "Teklifler", href: "/offers", icon: <FileText size={13} /> },
+    ],
+  },
+  {
+    kind: "item",
+    label: "Ön Muhasebe",
+    href: "/accounting",
+    icon: <WalletCards size={16} />,
+    children: [
+      // Genel
+      { label: "Genel Bakış", href: "/accounting", icon: <BarChart2 size={13} /> },
+      // Ön Muhasebe section
+      {
+        kind: "section",
+        label: "ÖN MUHASEBE",
+        items: [
+          { label: "Cariler", href: "/accounting/accounts", icon: <Users size={13} /> },
+          { label: "Satışlar", href: "/accounting/sales", icon: <TrendingUp size={13} /> },
+          { label: "Alışlar", href: "/accounting/purchases", icon: <TrendingDown size={13} /> },
+        ],
+      },
+      // Finans section
+      {
+        kind: "section",
+        label: "FİNANS",
+        items: [
+          { label: "Kasa ve Bankalar", href: "/accounting/finance", icon: <Landmark size={13} /> },
+          { label: "Çek ve Senetler", href: "/accounting/checks", icon: <FileCheck size={13} /> },
+        ],
+      },
+      // Raporlar section
+      {
+        kind: "section",
+        label: "RAPORLAR",
+        items: [
+          { label: "Gün Sonu", href: "/accounting/reports/daily", icon: <Calendar size={13} /> },
+          { label: "Kasa Hareketleri", href: "/accounting/reports/cashflow", icon: <Wallet size={13} /> },
+          { label: "Alacak Raporu", href: "/accounting/reports/receivable", icon: <FileBarChart size={13} /> },
+          { label: "Borç Raporu", href: "/accounting/reports/payable", icon: <FileBarChart size={13} /> },
+          { label: "Satış Raporu", href: "/accounting/reports/sales", icon: <ShoppingCart size={13} /> },
+          { label: "Alış Raporu", href: "/accounting/reports/purchases", icon: <ShoppingBag size={13} /> },
+          { label: "KDV Raporu", href: "/accounting/reports/vat", icon: <Receipt size={13} /> },
+        ],
+      },
+    ],
+  },
+  {
+    kind: "item",
+    label: "Stok & Maliyet",
+    href: "/inventory",
+    icon: <Warehouse size={16} />,
+  },
+  {
+    kind: "item",
+    label: "Şantiye İlerleme",
+    href: "/site-progress",
+    icon: <HardHat size={16} />,
+  },
+  {
+    kind: "item",
+    label: "Raporlar",
+    href: "/reports",
+    icon: <PieChart size={16} />,
+  },
+  {
+    kind: "item",
+    label: "Sistem Ayarları",
+    href: "/settings",
+    icon: <Settings2 size={16} />,
+    children: [
+      { label: "Şablon Editörü", href: "/settings/templates", icon: <LayoutTemplate size={13} /> },
+    ],
+  },
+];
+
+// ─── Helper ───────────────────────────────────────────────────────────────────
+function isNavSection(item: NavChild | NavSection): item is NavSection {
+  return (item as NavSection).kind === "section";
+}
+
+function isGroupActive(entry: NavEntry, pathname: string): boolean {
+  if (entry.exact) return pathname === entry.href;
+  return pathname.startsWith(entry.href) && entry.href !== "/";
+}
+
+// ─── Sub-item link ────────────────────────────────────────────────────────────
+function SubLink({ href, label, icon }: NavChild) {
   const pathname = usePathname();
-  const isActive = pathname === href;
+  const isActive = href === "/accounting"
+    ? pathname === href
+    : pathname === href || pathname.startsWith(href + "/") && href !== "/";
 
   return (
-    <Link
-      href={href}
-      title={collapsed ? label : undefined}
-      className={`flex items-center gap-3 rounded-md text-sidebar-foreground transition-colors ${collapsed ? 'justify-center p-2' : 'px-3 py-2'} ${isActive ? 'bg-primary/10 text-primary font-medium' : 'hover:bg-slate-200 hover:text-primary'}`}
-    >
-      {icon}
-      {!collapsed && <span className="font-medium whitespace-nowrap">{label}</span>}
+    <Link href={href}
+      className={`flex items-center gap-2 px-2.5 py-[5px] rounded text-[12.5px] transition-colors
+                ${isActive
+          ? "bg-[#e8edf5] text-[#1a56db] font-semibold"
+          : "text-slate-500 hover:bg-slate-100 hover:text-slate-800"
+        }`}>
+      {icon && <span className={isActive ? "text-[#1a56db]" : "text-slate-400"}>{icon}</span>}
+      <span className="truncate">{label}</span>
     </Link>
   );
 }
 
-function SidebarExpandableItem({ icon, label, collapsed, children, activePaths }: { icon: React.ReactNode; label: string; collapsed: boolean, children: React.ReactNode, activePaths: string[] }) {
+// ─── Expandable NavItem ───────────────────────────────────────────────────────
+function NavItemRow({ entry }: { entry: NavEntry }) {
   const pathname = usePathname();
-  const isActiveGroup = activePaths.some(path => pathname.startsWith(path));
-  const [isOpen, setIsOpen] = useState(isActiveGroup);
+  const active = isGroupActive(entry, pathname);
+  const [open, setOpen] = useState(active);
 
-  // If collapsed, always force close visually or handle hover menu (for now we keep it simple)
-  // Auto-open if active path is inside
   useEffect(() => {
-    if (isActiveGroup && !collapsed) {
-      setIsOpen(true);
-    }
-  }, [isActiveGroup, collapsed]);
+    if (active) setOpen(true);
+  }, [active]);
+
+  const hasChildren = entry.children && entry.children.length > 0;
+
+  if (!hasChildren) {
+    const isActive = entry.exact ? pathname === entry.href : pathname === entry.href;
+    return (
+      <Link href={entry.href}
+        className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] font-medium transition-colors
+                    ${isActive
+            ? "bg-[#eef2fb] text-[#1a56db]"
+            : "text-slate-600 hover:bg-slate-100 hover:text-slate-800"
+          }`}>
+        <span className={isActive ? "text-[#1a56db]" : "text-slate-400"}>{entry.icon}</span>
+        <span>{entry.label}</span>
+      </Link>
+    );
+  }
 
   return (
-    <div className="flex flex-col space-y-1">
+    <div>
       <button
-        onClick={() => !collapsed && setIsOpen(!isOpen)}
-        title={collapsed ? label : undefined}
-        className={`flex items-center justify-between w-full rounded-md text-sidebar-foreground transition-colors ${collapsed ? 'justify-center p-2' : 'px-3 py-2'} ${isOpen && !collapsed ? 'bg-slate-100' : 'hover:bg-slate-200 hover:text-primary'} ${isActiveGroup && collapsed ? 'bg-primary/10 text-primary' : ''}`}
-      >
-        <div className="flex items-center gap-3">
-          {icon}
-          {!collapsed && <span className="font-medium whitespace-nowrap">{label}</span>}
-        </div>
-        {!collapsed && (
-          <ChevronDown size={16} className={`transition-transform duration-200 ${isOpen ? 'rotate-180 text-primary' : ''}`} />
-        )}
+        onClick={() => setOpen(o => !o)}
+        className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] font-medium transition-colors
+                    ${active && !open ? "text-[#1a56db] bg-[#eef2fb]" : open ? "text-slate-700 bg-slate-100" : "text-slate-600 hover:bg-slate-100 hover:text-slate-800"}`}>
+        <span className={active ? "text-[#1a56db]" : "text-slate-400"}>{entry.icon}</span>
+        <span className="flex-1 text-left">{entry.label}</span>
+        <ChevronDown size={14}
+          className={`text-slate-400 transition-transform duration-200 ${open ? "rotate-180" : ""}`} />
       </button>
 
-      {/* Children Container */}
-      {!collapsed && isOpen && (
-        <div className="flex flex-col pl-9 pr-2 py-1 space-y-1 bg-slate-50/50 rounded-b-md border-l-2 border-primary/20 ml-2">
-          {children}
+      {open && (
+        <div className="mt-0.5 ml-3 pl-3 border-l border-slate-200 space-y-0.5 py-1">
+          {entry.children!.map((child, ci) => {
+            if (isNavSection(child)) {
+              return (
+                <div key={ci} className="pt-2 pb-0.5">
+                  <p className="px-2.5 pb-1 text-[10px] font-bold tracking-widest text-slate-400 uppercase">
+                    {child.label}
+                  </p>
+                  <div className="space-y-0.5">
+                    {child.items.map(item => (
+                      <SubLink key={item.href} {...item} />
+                    ))}
+                  </div>
+                </div>
+              );
+            }
+            return <SubLink key={ci} {...child} />;
+          })}
         </div>
       )}
     </div>
   );
 }
 
-function SidebarSubItem({ icon, label, href, collapsed }: { icon: React.ReactNode; label: string; href: string; collapsed: boolean }) {
+// ─── Sidebar ──────────────────────────────────────────────────────────────────
+export function Sidebar() {
   const pathname = usePathname();
-  const isActive = pathname === href;
+  const [mobileOpen, setMobileOpen] = useState(false);
 
-  if (collapsed) return null; // Don't show sub-items when collapsed
+  useEffect(() => { setMobileOpen(false); }, [pathname]);
+
+  if (pathname === "/login") return null;
+
+  const inner = (
+    <div className="flex flex-col h-full">
+      {/* Logo */}
+      <div className="h-12 flex items-center px-4 border-b border-slate-200 shrink-0">
+        <Link href="/" className="flex items-center">
+          <img src="/logo.png" alt="BelconCORE" className="h-7 max-w-[140px] object-contain" />
+        </Link>
+        {/* Mobile close */}
+        <button onClick={() => setMobileOpen(false)}
+          className="ml-auto md:hidden text-slate-400 hover:text-slate-600 p-1">
+          <X size={18} />
+        </button>
+      </div>
+
+      {/* Nav */}
+      <nav className="flex-1 overflow-y-auto px-2 py-3 space-y-0.5">
+        {NAV.map((entry, i) => (
+          <NavItemRow key={i} entry={entry} />
+        ))}
+      </nav>
+
+      {/* Footer */}
+      <div className="border-t border-slate-200 px-4 py-2.5 shrink-0">
+        <p className="text-[11px] text-slate-400 text-center">
+          &copy; {new Date().getFullYear()} Belcon
+        </p>
+      </div>
+    </div>
+  );
 
   return (
-    <Link
-      href={href}
-      className={`flex items-center gap-2.5 rounded-md px-2 py-1.5 text-sm transition-colors ${isActive ? 'bg-primary/10 text-primary font-medium' : 'text-slate-600 hover:text-primary hover:bg-slate-100'}`}
-    >
-      <span className="opacity-70">{icon}</span>
-      <span className="whitespace-nowrap">{label}</span>
-    </Link>
+    <>
+      {/* Mobile hamburger */}
+      <button
+        onClick={() => setMobileOpen(true)}
+        className="md:hidden fixed top-3 left-3 z-50 bg-white border border-slate-200 rounded-lg p-2 shadow-sm text-slate-600 hover:text-slate-800">
+        <Menu size={18} />
+      </button>
+
+      {/* Mobile overlay */}
+      {mobileOpen && (
+        <div className="md:hidden fixed inset-0 z-40 bg-black/40"
+          onClick={() => setMobileOpen(false)} />
+      )}
+
+      {/* Mobile drawer */}
+      <aside className={`
+                md:hidden fixed top-0 left-0 h-full z-50 w-72 bg-white shadow-2xl border-r border-slate-200
+                transition-transform duration-300
+                ${mobileOpen ? "translate-x-0" : "-translate-x-full"}
+            `}>
+        {inner}
+      </aside>
+
+      {/* Desktop sidebar */}
+      <aside className="hidden md:flex flex-col w-[230px] shrink-0 bg-white border-r border-slate-200 h-full">
+        {inner}
+      </aside>
+    </>
   );
 }
