@@ -1,6 +1,5 @@
 'use client';
 
-// Visual preview renderers for each block type on the A4 canvas
 import React from 'react';
 import { TemplateBlock, getBlockCatalogueItem } from './types';
 
@@ -9,29 +8,47 @@ interface BlockPreviewProps {
     selected?: boolean;
 }
 
+// ─── Extract style overrides from block settings ──────────────────────
+
+function extractStyle(settings: Record<string, unknown>): React.CSSProperties {
+    const s: React.CSSProperties = {};
+    if (settings._bg_color) s.backgroundColor = settings._bg_color as string;
+    if (settings._text_color) s.color = settings._text_color as string;
+    if (settings._font_size) s.fontSize = `${settings._font_size}pt`;
+    if (settings._font_weight === 'bold') s.fontWeight = 700;
+    if (settings._border_width && settings._border_color) {
+        s.border = `${settings._border_width}px solid ${settings._border_color}`;
+        s.borderRadius = 3;
+    }
+    if (settings._padding) s.padding = `${settings._padding}mm`;
+    if (settings._margin_top) s.marginTop = `${settings._margin_top}mm`;
+    if (settings._margin_bottom) s.marginBottom = `${settings._margin_bottom}mm`;
+    return s;
+}
+
 // ─── Shared micro-components ──────────────────────────────────────────
 
-const Row = ({ label, value }: { label: string; value: string }) => (
+const Row = ({ label, value, color }: { label: string; value: string; color?: string }) => (
     <div style={{ display: 'flex', gap: 6, marginBottom: 2 }}>
         <span style={{ fontSize: 7, color: '#94a3b8', minWidth: 68, flexShrink: 0 }}>{label}</span>
-        <span style={{ fontSize: 7, color: '#334155', fontWeight: 500 }}>{value}</span>
+        <span style={{ fontSize: 7, color: color ?? '#334155', fontWeight: 500 }}>{value}</span>
     </div>
 );
 
-const STitle = ({ children }: { children: React.ReactNode }) => (
-    <div style={{ fontSize: 6, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: '#94a3b8', marginBottom: 4 }}>
+const STitle = ({ children, color }: { children: React.ReactNode; color?: string }) => (
+    <div style={{ fontSize: 6, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: color ?? '#94a3b8', marginBottom: 4 }}>
         {children}
     </div>
 );
 
-const InfoBox = ({ title, children }: { title: string; children: React.ReactNode }) => (
-    <div style={{ flex: 1, border: '1px solid #e2e8f0', borderRadius: 4, padding: '5px 7px' }}>
+const InfoBox = ({ title, children, bg }: { title: string; children: React.ReactNode; bg?: string }) => (
+    <div style={{ flex: 1, border: '1px solid #e2e8f0', borderRadius: 4, padding: '5px 7px', background: bg ?? 'transparent' }}>
         <STitle>{title}</STitle>
         {children}
     </div>
 );
 
-// ─── Renderers ────────────────────────────────────────────────────────
+// ─── Block Renderers ──────────────────────────────────────────────────
 
 function LogoBlockRenderer({ settings }: { settings: Record<string, unknown> }) {
     const align = (settings.align as string) || 'left';
@@ -40,7 +57,7 @@ function LogoBlockRenderer({ settings }: { settings: Record<string, unknown> }) 
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                 <div style={{ width: 26, height: 26, background: 'linear-gradient(135deg,#0f172a,#1e40af)', borderRadius: 4 }} />
                 <div>
-                    <div style={{ fontSize: 9, fontWeight: 700, color: '#0f172a', letterSpacing: '-0.02em' }}>Belcon</div>
+                    <div style={{ fontSize: 9, fontWeight: 700, color: 'inherit', letterSpacing: '-0.02em' }}>Belcon</div>
                     <div style={{ fontSize: 6, color: '#64748b', letterSpacing: '0.08em', textTransform: 'uppercase' }}>Gayrimenkul</div>
                 </div>
             </div>
@@ -59,19 +76,19 @@ function DividerBlockRenderer({ settings }: { settings: Record<string, unknown> 
     );
 }
 
-function InfoGridBlockRenderer() {
+function InfoGridBlockRenderer({ settings }: { settings: Record<string, unknown> }) {
+    const bg = (settings._bg_color as string) ?? undefined;
     return (
         <div style={{ display: 'flex', gap: 8 }}>
-            <InfoBox title="Müşteri Bilgileri">
+            <InfoBox title="Müşteri Bilgileri" bg={bg}>
                 <Row label="Ad / Unvan" value="Ahmet Yılmaz" />
                 <Row label="Telefon" value="+90 532 000 0000" />
                 <Row label="E-posta" value="ahmet@mail.com" />
             </InfoBox>
-            <InfoBox title="Teklif Detayları">
+            <InfoBox title="Teklif Detayları" bg={bg}>
                 <Row label="Konut" value="A Blok / No: 12" />
                 <Row label="Tip" value="2+1  ·  85 m²" />
                 <Row label="Teklif Tarihi" value="02.03.2026" />
-                <Row label="Hazırlayan" value="Admin" />
             </InfoBox>
         </div>
     );
@@ -115,7 +132,7 @@ function PaymentPlanBlockRenderer() {
         <div>
             <STitle>Ödeme Planı</STitle>
             <div style={{ border: '1px solid #e2e8f0', borderRadius: 4, padding: '5px 8px', fontSize: 7.5, color: '#334155', lineHeight: 1.5 }}>
-                %25 Kaparo: 600.000 ₺ &mdash; Sözleşme imzasında<br />
+                %25 Kaparo: 600.000 ₺ — Sözleşme imzasında<br />
                 %25 Temel atımında: 600.000 ₺<br />
                 %50 Teslimde: 1.200.000 ₺
             </div>
@@ -128,7 +145,7 @@ function NotesBlockRenderer() {
         <div>
             <STitle>Notlar ve Özel Koşullar</STitle>
             <div style={{ border: '1px solid #e2e8f0', borderRadius: 4, padding: '5px 8px', fontSize: 7.5, color: '#334155', lineHeight: 1.5 }}>
-                İşbu teklif, taraflar arasında imzalanacak resmi satış sözleşmesinin yerini tutmaz. Fiyatlara KDV dahil değildir.
+                İşbu teklif resmi satış sözleşmesinin yerini tutmaz. Fiyatlara KDV dahil değildir.
             </div>
         </div>
     );
@@ -141,7 +158,7 @@ function SignatureBlockRenderer({ settings }: { settings: Record<string, unknown
         <div style={{ display: 'flex', gap: 12, marginTop: 6 }}>
             {labels.slice(0, cols).map((label, i) => (
                 <div key={i} style={{ flex: 1 }}>
-                    <div style={{ height: 18, borderTop: '1px solid #cbd5e1', marginBottom: 2 }} />
+                    <div style={{ height: 18, borderTop: `1px solid ${(settings._border_color as string) ?? '#cbd5e1'}`, marginBottom: 2 }} />
                     <span style={{ fontSize: 6.5, color: '#64748b' }}>{label}</span>
                 </div>
             ))}
@@ -149,15 +166,16 @@ function SignatureBlockRenderer({ settings }: { settings: Record<string, unknown
     );
 }
 
-function FooterBlockRenderer() {
+function FooterBlockRenderer({ settings }: { settings: Record<string, unknown> }) {
+    const tc = (settings._text_color as string) ?? '#94a3b8';
     return (
         <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: 5, borderTop: '1px solid #e2e8f0' }}>
-            <div style={{ fontSize: 6.5, color: '#94a3b8', lineHeight: 1.5 }}>
+            <div style={{ fontSize: 6.5, color: tc, lineHeight: 1.5 }}>
                 <div style={{ fontWeight: 700, color: '#0f172a', fontSize: 7 }}>Belcon Gayrimenkul</div>
                 <div>Atatürk Cad. No:1 Kadıköy / İstanbul</div>
                 <div>VKN: 1234567890 / Kadıköy VD</div>
             </div>
-            <div style={{ fontSize: 6.5, color: '#94a3b8', textAlign: 'right' }}>
+            <div style={{ fontSize: 6.5, color: tc, textAlign: 'right' }}>
                 <div>TKF-2026-0001 · 02.03.2026</div>
             </div>
         </div>
@@ -166,16 +184,17 @@ function FooterBlockRenderer() {
 
 function TextBlockRenderer({ settings }: { settings: Record<string, unknown> }) {
     return (
-        <div style={{ textAlign: ((settings.align as string) || 'left') as 'left' | 'center' | 'right', fontSize: (settings.font_size as number) || 9, color: '#334155' }}>
+        <div style={{ textAlign: ((settings.align as string) || 'left') as 'left' | 'center' | 'right', fontSize: (settings.font_size as number) || 9, color: 'inherit' }}>
             {(settings.content as string) || 'Serbest metin alanı'}
         </div>
     );
 }
 
 function CompanyInfoBlockRenderer({ settings }: { settings: Record<string, unknown> }) {
+    const tc = (settings._text_color as string) ?? '#334155';
     return (
-        <div style={{ fontSize: 7.5, color: '#334155', lineHeight: 1.6 }}>
-            <div style={{ fontWeight: 700, color: '#0f172a', fontSize: 9, marginBottom: 2 }}>Belcon Gayrimenkul A.Ş.</div>
+        <div style={{ fontSize: 7.5, color: tc, lineHeight: 1.6 }}>
+            <div style={{ fontWeight: 700, color: 'inherit', fontSize: 9, marginBottom: 2 }}>Belcon Gayrimenkul A.Ş.</div>
             {settings.show_address !== false && <div>Atatürk Cad. No:1 Kadıköy / İstanbul</div>}
             {settings.show_phone !== false && <div>Tel: +90 212 000 0000</div>}
             {settings.show_email !== false && <div>info@belcon.com.tr</div>}
@@ -191,7 +210,6 @@ function ClientInfoBlockRenderer({ settings }: { settings: Record<string, unknow
             {settings.show_phone !== false && <Row label="Telefon" value="+90 532 000 0000" />}
             {settings.show_email !== false && <Row label="E-posta" value="ahmet@mail.com" />}
             {settings.show_address !== false && <Row label="Adres" value="Bağcılar / İstanbul" />}
-            {settings.show_tax !== false && <Row label="TC No" value="12345678901" />}
         </InfoBox>
     );
 }
@@ -240,13 +258,17 @@ const RENDERERS: Record<string, React.ComponentType<{ settings: Record<string, u
 export function BlockPreview({ block, selected }: BlockPreviewProps) {
     const meta = getBlockCatalogueItem(block.type);
     const Renderer = RENDERERS[block.type];
+    const overrideStyle = extractStyle(block.settings);
 
     return (
         <div style={{
-            padding: '5px 6px',
-            borderRadius: 3,
-            border: selected ? '1.5px solid #3b82f6' : '1.5px dashed transparent',
-            background: selected ? '#eff6ff' : 'transparent',
+            ...overrideStyle,
+            padding: overrideStyle.padding ?? '5px 6px',
+            borderRadius: overrideStyle.borderRadius ?? 3,
+            border: selected
+                ? '1.5px solid #3b82f6'
+                : overrideStyle.border ?? '1.5px dashed transparent',
+            background: overrideStyle.backgroundColor ?? 'transparent',
             position: 'relative',
             transition: 'border 0.1s',
         }}>
@@ -256,6 +278,7 @@ export function BlockPreview({ block, selected }: BlockPreviewProps) {
                     background: '#3b82f6', color: '#fff',
                     fontSize: 8, padding: '1px 5px', borderRadius: 2,
                     fontWeight: 600, letterSpacing: '0.04em',
+                    whiteSpace: 'nowrap', zIndex: 10,
                 }}>
                     {meta.label}
                 </div>
