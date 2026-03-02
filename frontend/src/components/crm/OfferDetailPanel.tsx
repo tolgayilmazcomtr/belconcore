@@ -89,7 +89,7 @@ export function OfferDetailPanel({ offer, open, onClose, onUpdated }: OfferDetai
 
     return (
         <Sheet open={open} onOpenChange={onClose}>
-            <SheetContent className="w-[500px] sm:max-w-[500px] p-0 flex flex-col h-full bg-slate-50/50">
+            <SheetContent className="w-[500px] sm:max-w-[500px] p-0 flex flex-col h-screen bg-slate-50/50 overflow-hidden">
                 {/* Header */}
                 <div className="bg-white border-b px-6 py-5 shrink-0 shadow-sm">
                     <SheetHeader>

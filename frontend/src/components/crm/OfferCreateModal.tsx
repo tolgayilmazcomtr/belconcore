@@ -125,7 +125,7 @@ export function OfferCreateModal({ lead, editOffer, trigger, onSuccess }: OfferC
             ...formData,
             customer_id: lead.customer_id,
             lead_id: lead.id,
-            unit_id: formData.unit_id ? parseInt(formData.unit_id) : null,
+            unit_id: formData.unit_id && formData.unit_id !== 'none' ? parseInt(formData.unit_id) : null,
             base_price: parseFloat(formData.base_price) || 0,
             discount_amount: parseFloat(formData.discount_amount) || 0,
             final_price: parseFloat(formData.final_price) || 0,
