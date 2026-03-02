@@ -2,24 +2,14 @@
 
 import React, { useEffect, useState } from 'react';
 import { TemplateEditor } from '@/components/settings/template-builder/TemplateEditor';
-import { TemplateConfig } from '@/components/settings/template-builder/types';
+import { TemplateConfig, DEFAULT_PAGE_SETTINGS } from '@/components/settings/template-builder/types';
 import { useProjectStore } from '@/store/useProjectStore';
 import api from '@/lib/api';
-import { Loader2, FileText, Receipt } from 'lucide-react';
+import { Loader2, FileText, Receipt, LayoutTemplate } from 'lucide-react';
 
-const TEMPLATE_TYPES: { type: 'offer' | 'invoice'; label: string; icon: React.ReactNode; description: string }[] = [
-    {
-        type: 'offer',
-        label: 'Teklif Şablonu',
-        icon: <FileText className="w-5 h-5" />,
-        description: 'Müşterilere gönderilen satış teklifleri',
-    },
-    {
-        type: 'invoice',
-        label: 'Fatura Şablonu',
-        icon: <Receipt className="w-5 h-5" />,
-        description: 'Proforma veya resmi fatura belgeleri',
-    },
+const TEMPLATE_TYPES: { type: 'offer' | 'invoice'; label: string; icon: React.ElementType; sub: string }[] = [
+    { type: 'offer', label: 'Teklif Şablonu', icon: FileText, sub: 'Satış teklifleri için şablon' },
+    { type: 'invoice', label: 'Fatura Şablonu', icon: Receipt, sub: 'Proforma fatura şablonu' },
 ];
 
 export default function TemplatesPage() {
@@ -33,80 +23,77 @@ export default function TemplatesPage() {
         setLoading(true);
         setConfig(null);
 
-        const params = activeProject?.id ? { project_id: activeProject.id } : {};
-
-        api.get(`/template-configs/${selectedType}`, { params })
+        api.get(`/template-configs/${selectedType}`, {
+            params: activeProject?.id ? { project_id: activeProject.id } : {},
+        })
             .then(r => setConfig(r.data.data))
-            .catch(() => {
-                // Fallback to empty config if endpoint unavailable
-                setConfig({
-                    type: selectedType,
-                    name: 'Varsayılan Şablon',
-                    project_id: activeProject?.id ?? null,
-                    blocks: [],
-                    page_settings: { margin: 14, font_size: 9 },
-                });
-            })
+            .catch(() => setConfig({
+                type: selectedType,
+                name: 'Varsayılan Şablon',
+                project_id: activeProject?.id ?? null,
+                blocks: [],
+                page_settings: DEFAULT_PAGE_SETTINGS,
+            }))
             .finally(() => setLoading(false));
     }, [selectedType, activeProject]);
 
-    // Landing when no project selected
     if (!activeProject) {
         return (
             <div className="flex flex-col items-center justify-center h-full text-slate-400 gap-3">
-                <FileText className="w-8 h-8 opacity-30" />
+                <LayoutTemplate className="w-8 h-8 opacity-25" />
                 <p className="text-sm">Şablon düzenlemek için önce bir proje seçin.</p>
             </div>
         );
     }
 
     return (
-        <div className="flex h-full bg-slate-50">
-            {/* Template type selector sidebar */}
-            <div className="w-60 shrink-0 border-r bg-white flex flex-col shadow-sm">
-                <div className="px-5 py-5 border-b">
-                    <h1 className="text-base font-bold text-slate-800">Şablon Editörü</h1>
-                    <p className="text-xs text-slate-400 mt-1">Proje: <span className="font-medium text-slate-600">{activeProject.name}</span></p>
+        <div className="flex h-full" style={{ fontFamily: 'Inter, system-ui, sans-serif' }}>
+            {/* Type selector */}
+            <div className="w-56 shrink-0 border-r border-slate-200 bg-white flex flex-col">
+                <div className="px-4 py-3 border-b border-slate-200 bg-slate-50">
+                    <p className="text-xs font-bold text-slate-600 uppercase tracking-wider">Şablon Editörü</p>
+                    <p className="text-[10px] text-slate-400 mt-0.5 truncate">Proje: {activeProject.name}</p>
                 </div>
 
-                <nav className="flex-1 p-3 space-y-1">
-                    {TEMPLATE_TYPES.map(t => (
-                        <button
-                            key={t.type}
-                            onClick={() => setSelectedType(t.type)}
-                            className={`w-full flex items-start gap-3 rounded-xl px-3 py-3 text-left transition-all ${selectedType === t.type
-                                    ? 'bg-primary/10 text-primary border border-primary/20'
-                                    : 'text-slate-600 hover:bg-slate-50 border border-transparent'
-                                }`}
-                        >
-                            <span className={`mt-0.5 shrink-0 ${selectedType === t.type ? 'text-primary' : 'text-slate-400'}`}>
-                                {t.icon}
-                            </span>
-                            <div>
-                                <p className="text-sm font-semibold leading-tight">{t.label}</p>
-                                <p className="text-xs opacity-70 mt-0.5 leading-tight">{t.description}</p>
-                            </div>
-                        </button>
-                    ))}
+                <nav className="flex-1 p-2 space-y-0.5">
+                    {TEMPLATE_TYPES.map(t => {
+                        const Icon = t.icon;
+                        return (
+                            <button
+                                key={t.type}
+                                onClick={() => setSelectedType(t.type)}
+                                className={`w-full flex items-center gap-2.5 rounded px-3 py-2 text-left transition-all ${selectedType === t.type
+                                        ? 'bg-blue-600 text-white'
+                                        : 'text-slate-600 hover:bg-slate-100'
+                                    }`}
+                            >
+                                <Icon size={14} strokeWidth={1.75} className="shrink-0" />
+                                <div className="min-w-0">
+                                    <p className="text-[11px] font-semibold leading-tight truncate">{t.label}</p>
+                                    <p className={`text-[9px] leading-tight mt-0.5 truncate ${selectedType === t.type ? 'text-blue-100' : 'text-slate-400'}`}>{t.sub}</p>
+                                </div>
+                            </button>
+                        );
+                    })}
                 </nav>
 
-                <div className="p-4 border-t">
-                    <div className="bg-blue-50 border border-blue-100 rounded-xl p-3">
-                        <p className="text-xs font-semibold text-blue-700 mb-1">💡 İpucu</p>
-                        <p className="text-[11px] text-blue-600 leading-relaxed">
-                            Blokları soldan sürükleyip A4 kanvas üzerine bırakın. Bloka tıklayıp sağ panelden özelleştirin.
+                <div className="p-3 border-t border-slate-200 bg-slate-50">
+                    <div className="rounded border border-blue-200 bg-blue-50 px-2.5 py-2">
+                        <p className="text-[10px] font-semibold text-blue-700 mb-0.5">Kullanım</p>
+                        <p className="text-[9px] text-blue-600 leading-relaxed">
+                            Bileşeni soldaki listeden A4 kanvasa sürükleyin. Seçili bileşenin ayarlarını sağ panelden düzenleyin.
                         </p>
                     </div>
                 </div>
             </div>
 
-            {/* Editor area */}
+            {/* Editor */}
             <div className="flex-1 overflow-hidden flex flex-col">
                 {loading ? (
-                    <div className="flex items-center justify-center h-full bg-slate-100">
-                        <div className="flex flex-col items-center gap-3 text-slate-400">
-                            <Loader2 className="w-8 h-8 animate-spin text-primary/60" />
-                            <p className="text-sm">Şablon yükleniyor…</p>
+                    <div className="flex items-center justify-center h-full bg-[#e8eaed]">
+                        <div className="flex flex-col items-center gap-2 text-slate-400">
+                            <Loader2 className="w-6 h-6 animate-spin text-blue-500" />
+                            <p className="text-xs">Şablon yükleniyor…</p>
                         </div>
                     </div>
                 ) : config ? (

@@ -23,10 +23,48 @@ export interface TemplateBlock {
     settings: Record<string, unknown>;
 }
 
-export interface PageSettings {
-    margin: number;
-    font_size: number;
+// ─── Page Size ───────────────────────────────────────────────────────
+
+export type PageSize = 'A4' | 'A5' | 'A3' | 'Letter' | 'Legal';
+export type PageOrientation = 'portrait' | 'landscape';
+
+/** Physical dimensions in mm */
+export const PAGE_DIMENSIONS_MM: Record<PageSize, { width: number; height: number }> = {
+    A4: { width: 210, height: 297 },
+    A5: { width: 148, height: 210 },
+    A3: { width: 297, height: 420 },
+    Letter: { width: 215.9, height: 279.4 },
+    Legal: { width: 215.9, height: 355.6 },
+};
+
+export const MM_TO_PX = 96 / 25.4; // 3.7795...
+
+export function getPagePx(size: PageSize, orientation: PageOrientation) {
+    const { width, height } = PAGE_DIMENSIONS_MM[size];
+    const wMm = orientation === 'landscape' ? height : width;
+    const hMm = orientation === 'landscape' ? width : height;
+    return { width: Math.round(wMm * MM_TO_PX), height: Math.round(hMm * MM_TO_PX) };
 }
+
+export interface PageSettings {
+    page_size: PageSize;
+    orientation: PageOrientation;
+    margin_top: number;    // mm
+    margin_bottom: number; // mm
+    margin_left: number;   // mm
+    margin_right: number;  // mm
+    font_size: number;     // pt
+}
+
+export const DEFAULT_PAGE_SETTINGS: PageSettings = {
+    page_size: 'A4',
+    orientation: 'portrait',
+    margin_top: 14,
+    margin_bottom: 18,
+    margin_left: 16,
+    margin_right: 16,
+    font_size: 9,
+};
 
 export interface TemplateConfig {
     id?: number | null;
@@ -42,7 +80,6 @@ export interface BlockCatalogueItem {
     type: BlockType;
     label: string;
     description: string;
-    icon: string; // emoji icon for palette
     category: 'header' | 'info' | 'pricing' | 'footer' | 'decoration';
     defaultSettings: Record<string, unknown>;
     settingsSchema: SettingField[];
@@ -62,7 +99,6 @@ export const BLOCK_CATALOGUE: BlockCatalogueItem[] = [
         type: 'LogoBlock',
         label: 'Logo',
         description: 'Proje logosu',
-        icon: '🏷️',
         category: 'header',
         defaultSettings: { align: 'left', max_height: 48 },
         settingsSchema: [
@@ -73,49 +109,45 @@ export const BLOCK_CATALOGUE: BlockCatalogueItem[] = [
     {
         type: 'CompanyInfoBlock',
         label: 'Şirket Bilgileri',
-        description: 'Ad, adres, telefon, vergi',
-        icon: '🏢',
+        description: 'Ad, adres, telefon, vergi no',
         category: 'header',
         defaultSettings: { show_phone: true, show_email: true, show_address: true, show_tax: true },
         settingsSchema: [
-            { key: 'show_phone', label: 'Telefon göster', type: 'boolean' },
-            { key: 'show_email', label: 'E-posta göster', type: 'boolean' },
-            { key: 'show_address', label: 'Adres göster', type: 'boolean' },
-            { key: 'show_tax', label: 'Vergi bilgisi göster', type: 'boolean' },
+            { key: 'show_phone', label: 'Telefon', type: 'boolean' },
+            { key: 'show_email', label: 'E-posta', type: 'boolean' },
+            { key: 'show_address', label: 'Adres', type: 'boolean' },
+            { key: 'show_tax', label: 'Vergi bilgisi', type: 'boolean' },
         ],
     },
     {
         type: 'ClientInfoBlock',
         label: 'Müşteri Bilgileri',
-        description: 'Müşteri adı, iletişim, adres',
-        icon: '👤',
+        description: 'Ad, iletişim, adres',
         category: 'info',
         defaultSettings: { show_phone: true, show_email: true, show_address: true, show_tax: true },
         settingsSchema: [
-            { key: 'show_phone', label: 'Telefon göster', type: 'boolean' },
-            { key: 'show_email', label: 'E-posta göster', type: 'boolean' },
-            { key: 'show_address', label: 'Adres göster', type: 'boolean' },
-            { key: 'show_tax', label: 'Vergi bilgisi göster', type: 'boolean' },
+            { key: 'show_phone', label: 'Telefon', type: 'boolean' },
+            { key: 'show_email', label: 'E-posta', type: 'boolean' },
+            { key: 'show_address', label: 'Adres', type: 'boolean' },
+            { key: 'show_tax', label: 'TC / Vergi No', type: 'boolean' },
         ],
     },
     {
         type: 'OfferMetaBlock',
         label: 'Teklif Bilgileri',
         description: 'Teklif no, tarih, hazırlayan',
-        icon: '📋',
         category: 'info',
         defaultSettings: { show_creator: true, show_date: true, show_validity: true },
         settingsSchema: [
-            { key: 'show_creator', label: 'Hazırlayan göster', type: 'boolean' },
-            { key: 'show_date', label: 'Tarih göster', type: 'boolean' },
-            { key: 'show_validity', label: 'Geçerlilik göster', type: 'boolean' },
+            { key: 'show_creator', label: 'Hazırlayan', type: 'boolean' },
+            { key: 'show_date', label: 'Tarih', type: 'boolean' },
+            { key: 'show_validity', label: 'Geçerlilik', type: 'boolean' },
         ],
     },
     {
         type: 'InfoGridBlock',
         label: 'İki Kolonlu Bilgi',
-        description: 'Müşteri + Teklif bilgisi yan yana',
-        icon: '⬛',
+        description: 'Müşteri + Teklif yan yana',
         category: 'info',
         defaultSettings: {},
         settingsSchema: [],
@@ -124,32 +156,29 @@ export const BLOCK_CATALOGUE: BlockCatalogueItem[] = [
         type: 'UnitInfoBlock',
         label: 'Ünite Bilgileri',
         description: 'Blok, no, tip, alan, kat',
-        icon: '🏠',
         category: 'info',
         defaultSettings: { show_floor: true, show_area: true },
         settingsSchema: [
-            { key: 'show_floor', label: 'Kat göster', type: 'boolean' },
-            { key: 'show_area', label: 'Alan göster', type: 'boolean' },
+            { key: 'show_floor', label: 'Kat', type: 'boolean' },
+            { key: 'show_area', label: 'Alan (m²)', type: 'boolean' },
         ],
     },
     {
         type: 'PricingTableBlock',
         label: 'Fiyat Tablosu',
         description: 'Baz fiyat, indirim, net fiyat',
-        icon: '💰',
         category: 'pricing',
         defaultSettings: { show_base: true, show_discount: true, header_bg: '#0f172a' },
         settingsSchema: [
-            { key: 'show_base', label: 'Baz fiyat göster', type: 'boolean' },
-            { key: 'show_discount', label: 'İndirim göster', type: 'boolean' },
+            { key: 'show_base', label: 'Baz fiyat', type: 'boolean' },
+            { key: 'show_discount', label: 'İndirim satırı', type: 'boolean' },
             { key: 'header_bg', label: 'Başlık rengi', type: 'color' },
         ],
     },
     {
         type: 'ValidityBlock',
         label: 'Geçerlilik Tarihi',
-        description: 'Teklifin geçerlilik bilgisi',
-        icon: '📅',
+        description: 'Teklifin son geçerlilik tarihi',
         category: 'info',
         defaultSettings: {},
         settingsSchema: [],
@@ -157,8 +186,7 @@ export const BLOCK_CATALOGUE: BlockCatalogueItem[] = [
     {
         type: 'PaymentPlanBlock',
         label: 'Ödeme Planı',
-        description: 'Ödeme planı metni',
-        icon: '💳',
+        description: 'Ödeme takvimi metni',
         category: 'pricing',
         defaultSettings: {},
         settingsSchema: [],
@@ -166,8 +194,7 @@ export const BLOCK_CATALOGUE: BlockCatalogueItem[] = [
     {
         type: 'NotesBlock',
         label: 'Notlar',
-        description: 'Özel notlar ve koşullar',
-        icon: '📝',
+        description: 'Özel koşullar ve notlar',
         category: 'info',
         defaultSettings: {},
         settingsSchema: [],
@@ -176,7 +203,6 @@ export const BLOCK_CATALOGUE: BlockCatalogueItem[] = [
         type: 'SignatureBlock',
         label: 'İmza Alanları',
         description: 'Müşteri ve yetkili imzası',
-        icon: '✍️',
         category: 'footer',
         defaultSettings: { columns: 3, labels: ['Müşteri / İmza', 'Yetkili / İmza', 'Tarih'] },
         settingsSchema: [
@@ -187,7 +213,6 @@ export const BLOCK_CATALOGUE: BlockCatalogueItem[] = [
         type: 'DividerBlock',
         label: 'Ayraç Çizgisi',
         description: 'Yatay bölücü çizgi',
-        icon: '➖',
         category: 'decoration',
         defaultSettings: { thickness: 1, color: '#e2e8f0', margin_top: 4, margin_bottom: 4 },
         settingsSchema: [
@@ -200,8 +225,7 @@ export const BLOCK_CATALOGUE: BlockCatalogueItem[] = [
     {
         type: 'TextBlock',
         label: 'Serbest Metin',
-        description: 'Özel statik metin',
-        icon: '📄',
+        description: 'Özel statik metin alanı',
         category: 'decoration',
         defaultSettings: { content: 'Metninizi buraya yazın', align: 'left', font_size: 9 },
         settingsSchema: [
@@ -213,8 +237,7 @@ export const BLOCK_CATALOGUE: BlockCatalogueItem[] = [
     {
         type: 'FooterBlock',
         label: 'Alt Bilgi',
-        description: 'Şirket bilgisi + sayfa notu',
-        icon: '📌',
+        description: 'Şirket bilgisi ve sayfa notu',
         category: 'footer',
         defaultSettings: {},
         settingsSchema: [],
@@ -226,7 +249,7 @@ export const CATEGORY_LABELS: Record<string, string> = {
     info: 'Bilgi Alanları',
     pricing: 'Fiyatlandırma',
     footer: 'Alt Bölüm',
-    decoration: 'Dekor & Düzen',
+    decoration: 'Düzen',
 };
 
 export function getBlockCatalogueItem(type: BlockType): BlockCatalogueItem {
