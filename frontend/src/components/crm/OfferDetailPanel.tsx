@@ -28,6 +28,8 @@ import {
     AlignLeft,
 } from 'lucide-react';
 import { OfferCreateModal } from './OfferCreateModal';
+import api from '@/lib/api';
+import { toast } from 'sonner';
 
 interface OfferDetailPanelProps {
     offer: Offer | null;
@@ -75,9 +77,20 @@ export function OfferDetailPanel({ offer, open, onClose, onUpdated }: OfferDetai
         ? `${(offer.unit as any).block?.name || '?'} Blok / No: ${offer.unit.unit_no}`
         : null;
 
-    const handlePdf = () => {
-        const base = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
-        window.open(`${base}/offers/${offer.id}/pdf`, '_blank');
+    const handlePdf = async () => {
+        try {
+            const response = await api.get(`/offers/${offer.id}/pdf`, { responseType: 'blob' });
+            const url = window.URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
+            const link = document.createElement('a');
+            link.href = url;
+            link.setAttribute('download', `Teklif_${offer.offer_no}.pdf`);
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            window.URL.revokeObjectURL(url);
+        } catch {
+            toast.error('PDF indirilemedi');
+        }
     };
 
     const discountPercent = offer.base_price > 0 && offer.discount_amount > 0

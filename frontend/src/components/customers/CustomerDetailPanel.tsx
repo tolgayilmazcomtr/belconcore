@@ -10,11 +10,13 @@ import {
     SheetDescription,
 } from '@/components/ui/sheet';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Building2, User2, Mail, Phone, MapPin, FileText, Target, Calendar, Download, Loader2 } from 'lucide-react';
+import { Building2, User2, Mail, Phone, MapPin, FileText, Target, Calendar, Download, Loader2, ArrowRight } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import api from '@/lib/api';
+import { toast } from 'sonner';
+import { useRouter } from 'next/navigation';
 
 interface CustomerDetailPanelProps {
     customer: Customer | null;
@@ -66,6 +68,24 @@ export function CustomerDetailPanel({ customer, open, onClose }: CustomerDetailP
     }, [customer, open]);
 
     if (!customer) return null;
+
+    const router = useRouter();
+
+    const downloadPdf = async (offerId: number, offerNo: string) => {
+        try {
+            const response = await api.get(`/offers/${offerId}/pdf`, { responseType: 'blob' });
+            const url = window.URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
+            const link = document.createElement('a');
+            link.href = url;
+            link.setAttribute('download', `Teklif_${offerNo}.pdf`);
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            window.URL.revokeObjectURL(url);
+        } catch {
+            toast.error('PDF indirilemedi');
+        }
+    };
 
     const customerName = customer.type === 'corporate'
         ? customer.company_name
@@ -207,6 +227,15 @@ export function CustomerDetailPanel({ customer, open, onClose }: CustomerDetailP
                                                                     </div>
                                                                 </div>
                                                             </div>
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="sm"
+                                                                className="gap-1.5 text-slate-500 hover:text-primary shrink-0"
+                                                                title="Fırsatlar sayfasına git"
+                                                                onClick={() => { onClose(); router.push('/crm'); }}
+                                                            >
+                                                                <ArrowRight className="w-4 h-4" />
+                                                            </Button>
                                                         </div>
                                                     );
                                                 })}
@@ -251,10 +280,7 @@ export function CustomerDetailPanel({ customer, open, onClose }: CustomerDetailP
                                                                 variant="ghost"
                                                                 size="sm"
                                                                 className="gap-1.5 text-primary hover:text-primary shrink-0"
-                                                                onClick={() => {
-                                                                    const base = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
-                                                                    window.open(`${base}/offers/${offer.id}/pdf`, '_blank');
-                                                                }}
+                                                                onClick={() => downloadPdf(offer.id, offer.offer_no)}
                                                             >
                                                                 <Download className="w-3.5 h-3.5" />
                                                                 PDF
