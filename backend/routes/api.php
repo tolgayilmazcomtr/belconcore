@@ -23,6 +23,7 @@ Route::middleware('auth:sanctum')->group(function () {
     });
 
     // Proje Yönetimi
+    Route::post('projects/{id}/logo', [ProjectController::class, 'uploadLogo']);
     Route::apiResource('projects', ProjectController::class);
 
     // Seçili Proje İçi Modüller (Blok ve Bağımsız Bölüm)

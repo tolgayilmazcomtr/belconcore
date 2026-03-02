@@ -3,12 +3,10 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 
 class ProjectController extends Controller
 {
-    /**
-     * Display a listing of the resource.
-     */
     public function index(Request $request)
     {
         $user = $request->user();
@@ -47,12 +45,10 @@ class ProjectController extends Controller
             'start_date' => 'nullable|date',
             'end_date' => 'nullable|date|after_or_equal:start_date',
             'planned_budget' => 'nullable|numeric|min:0',
-            'status' => 'nullable|in:planned,active,completed,suspended'
+            'status' => 'nullable|in:planned,active,completed,suspended',
         ]);
 
         $project = \App\Models\Project::create($validated);
-        
-        // Projeyi oluşturan personalar otomatik olarak bu projeye atanır
         $request->user()->projects()->attach($project->id);
 
         return response()->json(['message' => 'Proje başarıyla oluşturuldu.', 'data' => $project], 201);
@@ -75,12 +71,39 @@ class ProjectController extends Controller
             'start_date' => 'nullable|date',
             'end_date' => 'nullable|date|after_or_equal:start_date',
             'planned_budget' => 'nullable|numeric|min:0',
-            'status' => 'nullable|in:planned,active,completed,suspended'
+            'status' => 'nullable|in:planned,active,completed,suspended',
+            'company_name' => 'nullable|string|max:255',
+            'company_phone' => 'nullable|string|max:50',
+            'company_email' => 'nullable|email|max:255',
+            'company_address' => 'nullable|string',
+            'company_website' => 'nullable|string|max:255',
+            'tax_office' => 'nullable|string|max:255',
+            'tax_number' => 'nullable|string|max:50',
         ]);
 
         $project->update($validated);
 
         return response()->json(['message' => 'Proje başarıyla güncellendi.', 'data' => $project]);
+    }
+
+    public function uploadLogo(Request $request, string $id)
+    {
+        $request->validate(['logo' => 'required|image|mimes:jpeg,png,jpg,gif,svg,webp|max:2048']);
+
+        $project = \App\Models\Project::findOrFail($id);
+
+        if ($project->logo_path && Storage::disk('public')->exists($project->logo_path)) {
+            Storage::disk('public')->delete($project->logo_path);
+        }
+
+        $path = $request->file('logo')->store('logos', 'public');
+        $project->update(['logo_path' => $path]);
+
+        return response()->json([
+            'message' => 'Logo yüklendi.',
+            'logo_url' => Storage::disk('public')->url($path),
+            'data' => $project,
+        ]);
     }
 
     public function destroy(string $id)

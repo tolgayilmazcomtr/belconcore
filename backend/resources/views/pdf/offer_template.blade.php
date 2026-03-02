@@ -2,325 +2,385 @@
 <html lang="tr">
 <head>
     <meta charset="UTF-8">
-    <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
-    <title>Teklif - {{ $offer->offer_no }}</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teklif {{ $offer->offer_no }}</title>
     <style>
-        @page {
-            margin: 1cm;
+        /* ─── Reset & Base ─────────────────────────────── */
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        html, body {
+            width: 210mm;
+            font-family: 'DejaVu Sans', 'Arial', sans-serif;
+            font-size: 9pt;
+            color: #1e293b;
+            background: #fff;
         }
-        body {
-            font-family: 'DejaVu Sans', sans-serif; /* DejaVu supports Turkish chars */
-            color: #333;
-            font-size: 13px;
-            line-height: 1.5;
-            margin: 0;
-            padding: 0;
+
+        /* ─── Page wrapper ─────────────────────────────── */
+        .page {
+            width: 210mm;
+            min-height: 297mm;
+            padding: 14mm 16mm 18mm;
+            display: flex;
+            flex-direction: column;
         }
+
+        /* ─── Typography ───────────────────────────────── */
+        h1 { font-size: 20pt; font-weight: 700; }
+        h2 { font-size: 10pt; font-weight: 600; }
+        h3 { font-size: 8.5pt; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: #475569; }
+
+        /* ─── Header ───────────────────────────────────── */
         .header {
-            width: 100%;
-            border-bottom: 2px solid #1e293b;
-            padding-bottom: 20px;
-            margin-bottom: 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            padding-bottom: 10mm;
+            border-bottom: 2px solid #0f172a;
+            margin-bottom: 8mm;
         }
-        .header table {
-            width: 100%;
+
+        .logo-block { display: flex; align-items: center; gap: 8px; }
+        .logo-block img { max-height: 48px; max-width: 140px; object-fit: contain; }
+        .logo-text {
+            display: flex;
+            flex-direction: column;
         }
-        .header td {
-            vertical-align: middle;
-        }
-        .company-name {
-            font-size: 24px;
-            font-weight: bold;
-            color: #1e293b;
+        .logo-text .company { font-size: 13pt; font-weight: 700; color: #0f172a; letter-spacing: -0.02em; }
+        .logo-text .tagline { font-size: 7pt; color: #64748b; letter-spacing: 0.06em; text-transform: uppercase; margin-top: 1px; }
+
+        .header-right { text-align: right; }
+        .offer-label {
+            font-size: 7.5pt;
+            font-weight: 600;
+            letter-spacing: 0.1em;
             text-transform: uppercase;
-        }
-        .project-name {
-            font-size: 16px;
             color: #64748b;
+            margin-bottom: 2px;
         }
-        .title {
-            text-align: right;
-            font-size: 28px;
-            font-weight: bold;
-            color: #0ea5e9;
-            letter-spacing: 2px;
+        .offer-no { font-size: 17pt; font-weight: 700; color: #0f172a; }
+
+        /* ─── Status badge ─────────────────────────────── */
+        .status-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 3px;
+            font-size: 7pt;
+            font-weight: 600;
+            letter-spacing: 0.06em;
             text-transform: uppercase;
+            margin-top: 4px;
         }
-        .section {
-            margin-bottom: 30px;
+        .status-draft    { background: #f1f5f9; color: #475569; }
+        .status-sent     { background: #dbeafe; color: #1d4ed8; }
+        .status-accepted { background: #dcfce7; color: #15803d; }
+        .status-rejected { background: #fee2e2; color: #b91c1c; }
+
+        /* ─── Two-col info grid ─────────────────────────── */
+        .info-grid {
+            display: flex;
+            gap: 6mm;
+            margin-bottom: 7mm;
         }
-        .section-title {
-            font-size: 14px;
-            font-weight: bold;
-            color: #1e293b;
-            border-bottom: 1px solid #cbd5e1;
-            padding-bottom: 5px;
-            margin-bottom: 10px;
+        .info-box {
+            flex: 1;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            padding: 5mm 6mm;
+        }
+        .info-box-title {
+            font-size: 7pt;
+            font-weight: 700;
+            letter-spacing: 0.07em;
             text-transform: uppercase;
-        }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-        .info-table th, .info-table td {
-            text-align: left;
-            padding: 5px 0;
-            font-size: 13px;
-        }
-        .info-table th {
-            width: 120px;
-            color: #64748b;
-            font-weight: normal;
-        }
-        .info-table td {
-            font-weight: bold;
-        }
-        
-        .item-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 20px;
-        }
-        .item-table th {
-            background-color: #f1f5f9;
-            color: #1e293b;
-            font-weight: bold;
-            padding: 12px;
-            text-align: left;
-            border-bottom: 2px solid #cbd5e1;
-        }
-        .item-table td {
-            padding: 12px;
-            border-bottom: 1px solid #e2e8f0;
-            vertical-align: top;
-        }
-        .text-right {
-            text-align: right !important;
-        }
-        .text-center {
-            text-align: center !important;
-        }
-        .totals-table {
-            width: 40%;
-            float: right;
-            margin-top: 20px;
-        }
-        .totals-table th, .totals-table td {
-            padding: 8px 12px;
-            text-align: right;
-        }
-        .totals-table th {
-            color: #64748b;
-            font-weight: normal;
-        }
-        .totals-table .final-price {
-            font-size: 18px;
-            font-weight: bold;
-            color: #0f172a;
-            border-top: 2px solid #1e293b;
-        }
-        .clear {
-            clear: both;
-        }
-        .notes-section {
-            margin-top: 40px;
-            background-color: #f8fafc;
-            padding: 15px;
-            border-left: 4px solid #0ea5e9;
-            border-radius: 4px;
-        }
-        .footer {
-            position: fixed;
-            bottom: 0px;
-            left: 0px;
-            right: 0px;
-            height: 50px;
-            text-align: center;
-            font-size: 11px;
             color: #94a3b8;
+            border-bottom: 1px solid #f1f5f9;
+            padding-bottom: 3px;
+            margin-bottom: 5px;
+        }
+        .info-row { display: flex; align-items: baseline; margin-bottom: 3px; gap: 4px; }
+        .info-label { font-size: 7.5pt; color: #64748b; min-width: 70px; flex-shrink: 0; }
+        .info-value { font-size: 7.5pt; font-weight: 600; color: #1e293b; }
+
+        /* ─── Section heading ───────────────────────────── */
+        .section-title {
+            font-size: 7pt;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: #94a3b8;
+            margin-bottom: 3mm;
+            margin-top: 5mm;
+        }
+
+        /* ─── Pricing table ─────────────────────────────── */
+        .price-table { width: 100%; border-collapse: collapse; }
+        .price-table th {
+            background: #0f172a;
+            color: #fff;
+            font-size: 7.5pt;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            padding: 4.5pt 8pt;
+            text-align: left;
+        }
+        .price-table th:last-child, .price-table td:last-child { text-align: right; }
+        .price-table td {
+            padding: 5pt 8pt;
+            font-size: 8.5pt;
+            color: #334155;
+            border-bottom: 1px solid #f1f5f9;
+        }
+        .price-table tr:nth-child(even) td { background: #f8fafc; }
+        .price-table .total-row td {
+            background: #f1f5f9;
+            font-weight: 700;
+            font-size: 9.5pt;
+            color: #0f172a;
+            border-top: 2px solid #e2e8f0;
+            border-bottom: none;
+        }
+        .price-table .discount-val { color: #dc2626; }
+        .price-table .net-val { color: #0f172a; font-size: 10pt; }
+
+        /* ─── Payment / Notes ───────────────────────────── */
+        .text-block {
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            padding: 5mm 6mm;
+            margin-bottom: 4mm;
+        }
+        .text-block p {
+            font-size: 8.5pt;
+            color: #334155;
+            line-height: 1.55;
+            white-space: pre-line;
+        }
+
+        /* ─── Validity / validity ───────────────────────── */
+        .validity-bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            padding: 4mm 6mm;
+            margin-bottom: 4mm;
+        }
+        .validity-bar .label { font-size: 7.5pt; color: #64748b; }
+        .validity-bar .val { font-size: 9pt; font-weight: 700; color: #0f172a; }
+
+        /* ─── Signature area ────────────────────────────── */
+        .sig-grid {
+            display: flex;
+            gap: 8mm;
+            margin-top: 8mm;
+        }
+        .sig-box { flex: 1; }
+        .sig-line {
+            border-top: 1px solid #cbd5e1;
+            margin-top: 14mm;
+            padding-top: 3px;
+        }
+        .sig-label { font-size: 7.5pt; color: #64748b; }
+
+        /* ─── Footer ────────────────────────────────────── */
+        .footer {
+            margin-top: auto;
+            padding-top: 6mm;
             border-top: 1px solid #e2e8f0;
-            padding-top: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
         }
-        .signatures {
-            margin-top: 80px;
-            width: 100%;
-        }
-        .signature-box {
-            width: 45%;
-            float: left;
-            text-align: center;
-        }
-        .signature-box.right {
-            float: right;
-        }
-        .signature-line {
-            margin-top: 60px;
-            border-top: 1px solid #333;
-            width: 80%;
-            margin-left: auto;
-            margin-right: auto;
-            padding-top: 5px;
-        }
+        .footer-left { font-size: 7pt; color: #94a3b8; line-height: 1.5; }
+        .footer-right { font-size: 7pt; color: #94a3b8; text-align: right; }
+        .footer-brand { font-size: 7.5pt; font-weight: 700; color: #0f172a; }
     </style>
 </head>
 <body>
+<div class="page">
 
+    {{-- ══ HEADER ══════════════════════════════════════════ --}}
     <div class="header">
-        <table>
-            <tr>
-                <td style="width: 50%;">
-                    <div class="company-name">{{ $offer->project->name ?? 'BELCON CORE' }}</div>
-                    <div class="project-name">Gayrimenkul Satış Teklifi</div>
-                </td>
-                <td style="width: 50%;" class="title">
-                    TEKLİF
-                </td>
-            </tr>
-        </table>
+        <div class="logo-block">
+            @php
+                $project = $offer->project;
+                $logoUrl = null;
+                if ($project && $project->logo_path) {
+                    $logoUrl = storage_path('app/public/' . $project->logo_path);
+                }
+                $companyName = ($project && $project->company_name) ? $project->company_name : ($project->name ?? 'Belcon');
+            @endphp
+
+            @if($logoUrl && file_exists($logoUrl))
+                <img src="{{ $logoUrl }}" alt="{{ $companyName }}">
+            @else
+                <div class="logo-text">
+                    <span class="company">{{ $companyName }}</span>
+                    <span class="tagline">Gayrimenkul & İnşaat</span>
+                </div>
+            @endif
+        </div>
+
+        <div class="header-right">
+            <div class="offer-label">Satış Teklifi</div>
+            <div class="offer-no">{{ $offer->offer_no }}</div>
+            @php
+                $statusMap = [
+                    'draft'    => ['Taslak',       'status-draft'],
+                    'sent'     => ['Gönderildi',   'status-sent'],
+                    'accepted' => ['Kabul Edildi', 'status-accepted'],
+                    'rejected' => ['Reddedildi',   'status-rejected'],
+                ];
+                [$statusLabel, $statusClass] = $statusMap[$offer->status] ?? [$offer->status, 'status-draft'];
+            @endphp
+            <span class="status-badge {{ $statusClass }}">{{ $statusLabel }}</span>
+        </div>
     </div>
 
-    <table style="width: 100%; margin-bottom: 30px;">
-        <tr>
-            <td style="width: 50%; vertical-align: top; padding-right: 20px;">
-                <div class="section-title">Müşteri Bilgileri</div>
-                <table class="info-table">
-                    <tr>
-                        <th>Müşteri:</th>
-                        <td>{{ $offer->customer->type === 'corporate' ? $offer->customer->company_name : $offer->customer->first_name . ' ' . $offer->customer->last_name }}</td>
-                    </tr>
-                    @if($offer->customer->phone)
-                    <tr>
-                        <th>Telefon:</th>
-                        <td>{{ $offer->customer->phone }}</td>
-                    </tr>
-                    @endif
-                    @if($offer->customer->email)
-                    <tr>
-                        <th>E-Posta:</th>
-                        <td>{{ $offer->customer->email }}</td>
-                    </tr>
-                    @endif
-                    @if($offer->customer->address)
-                    <tr>
-                        <th>Adres:</th>
-                        <td>{{ $offer->customer->address }}
-                            @if($offer->customer->district || $offer->customer->city)
-                                <br>{{ $offer->customer->district }} / {{ $offer->customer->city }}
-                            @endif
-                        </td>
-                    </tr>
-                    @endif
-                </table>
-            </td>
-            <td style="width: 50%; vertical-align: top;">
-                <div class="section-title">Teklif Bilgileri</div>
-                <table class="info-table">
-                    <tr>
-                        <th>Teklif No:</th>
-                        <td>{{ $offer->offer_no }}</td>
-                    </tr>
-                    <tr>
-                        <th>Tarih:</th>
-                        <td>{{ $offer->created_at->format('d.m.Y') }}</td>
-                    </tr>
-                    <tr>
-                        <th>Geçerlilik:</th>
-                        <td>{{ $offer->valid_until ? \Carbon\Carbon::parse($offer->valid_until)->format('d.m.Y') : 'Belirtilmemiş' }}</td>
-                    </tr>
-                    <tr>
-                        <th>Hazırlayan:</th>
-                        <td>{{ $offer->creator->name ?? 'Sistem' }}</td>
-                    </tr>
-                </table>
-            </td>
-        </tr>
-    </table>
+    {{-- ══ INFO GRID ════════════════════════════════════════ --}}
+    <div class="info-grid">
+        {{-- Müşteri --}}
+        <div class="info-box">
+            <div class="info-box-title">Müşteri Bilgileri</div>
+            @if($offer->customer)
+            @php
+                $c = $offer->customer;
+                $cName = $c->type === 'corporate' ? $c->company_name : "{$c->first_name} {$c->last_name}";
+            @endphp
+            <div class="info-row"><span class="info-label">Ad / Unvan</span><span class="info-value">{{ $cName }}</span></div>
+            @if($c->phone)
+            <div class="info-row"><span class="info-label">Telefon</span><span class="info-value">{{ $c->phone }}</span></div>
+            @endif
+            @if($c->email)
+            <div class="info-row"><span class="info-label">E-posta</span><span class="info-value">{{ $c->email }}</span></div>
+            @endif
+            @if($c->address)
+            <div class="info-row"><span class="info-label">Adres</span><span class="info-value">{{ $c->address }}{{ $c->city ? ', '.$c->city : '' }}</span></div>
+            @endif
+            @if($c->type === 'corporate' && $c->tax_number)
+            <div class="info-row"><span class="info-label">Vergi No</span><span class="info-value">{{ $c->tax_number }} / {{ $c->tax_office }}</span></div>
+            @endif
+            @endif
+        </div>
 
-    <div class="section">
-        <div class="section-title">Teklif Edilen Gayrimenkul (Ünite)</div>
-        <table class="item-table">
-            <thead>
-                <tr>
-                    <th>Blok</th>
-                    <th>Ünite No</th>
-                    <th>Kat</th>
-                    <th>Oda Tipi</th>
-                    <th class="text-right">Brüt / Net (m²)</th>
-                    <th class="text-right">Liste Fiyatı</th>
-                </tr>
-            </thead>
-            <tbody>
-                @if($offer->unit)
-                <tr>
-                    <td>{{ $offer->unit->block->name ?? '-' }}</td>
-                    <td><b>{{ $offer->unit->unit_no ?? '-' }}</b></td>
-                    <td>{{ $offer->unit->floor ?? '-' }}</td>
-                    <td>{{ $offer->unit->room_types ?? '-' }}</td>
-                    <td class="text-right">{{ $offer->unit->gross_area ?? '-' }} / {{ $offer->unit->net_area ?? '-' }}</td>
-                    <td class="text-right">{{ number_format($offer->base_price, 2, ',', '.') }} ₺</td>
-                </tr>
-                @else
-                <tr>
-                    <td colspan="6" class="text-center">Özel bir ünite seçilmedi.</td>
-                </tr>
-                <tr>
-                    <td colspan="5">Pazarlık Tutarı (Belirtilmemiş Ünite)</td>
-                    <td class="text-right">{{ number_format($offer->base_price, 2, ',', '.') }} ₺</td>
-                </tr>
-                @endif
-            </tbody>
-        </table>
+        {{-- Ünite --}}
+        <div class="info-box">
+            <div class="info-box-title">Teklif Detayları</div>
+            @if($offer->unit)
+            @php $u = $offer->unit; @endphp
+            <div class="info-row"><span class="info-label">Konut</span><span class="info-value">{{ $u->block->name ?? '' }} Blok / No: {{ $u->unit_no }}</span></div>
+            <div class="info-row"><span class="info-label">Tip</span><span class="info-value">{{ $u->unit_type ?? '-' }}</span></div>
+            @if($u->net_area)
+            <div class="info-row"><span class="info-label">Net Alan</span><span class="info-value">{{ $u->net_area }} m²</span></div>
+            @endif
+            @if($u->gross_area)
+            <div class="info-row"><span class="info-label">Brüt Alan</span><span class="info-value">{{ $u->gross_area }} m²</span></div>
+            @endif
+            @if($u->floor_no !== null)
+            <div class="info-row"><span class="info-label">Kat</span><span class="info-value">{{ $u->floor_no }}. Kat</span></div>
+            @endif
+            @endif
+            <div class="info-row"><span class="info-label">Teklif Tarihi</span><span class="info-value">{{ $offer->created_at ? $offer->created_at->format('d.m.Y') : '-' }}</span></div>
+            @if($offer->creator)
+            <div class="info-row"><span class="info-label">Hazırlayan</span><span class="info-value">{{ $offer->creator->name }}</span></div>
+            @endif
+        </div>
+    </div>
 
-        <table class="totals-table">
+    {{-- ══ FİYATLANDIRMA ════════════════════════════════════ --}}
+    <div class="section-title">Fiyatlandırma</div>
+    <table class="price-table">
+        <thead>
             <tr>
-                <th>Liste Fiyatı:</th>
-                <td>{{ number_format($offer->base_price, 2, ',', '.') }} ₺</td>
+                <th style="width:55%">Açıklama</th>
+                <th style="width:20%;text-align:right">Birim Fiyat</th>
+                <th style="width:25%;text-align:right">Tutar</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>Liste / Baz Satış Fiyatı</td>
+                <td style="text-align:right">{{ number_format($offer->base_price, 0, ',', '.') }} ₺</td>
+                <td style="text-align:right">{{ number_format($offer->base_price, 0, ',', '.') }} ₺</td>
             </tr>
             @if($offer->discount_amount > 0)
             <tr>
-                <th>İndirim:</th>
-                <td style="color: #ef4444;">-{{ number_format($offer->discount_amount, 2, ',', '.') }} ₺</td>
+                <td>Özel İndirim</td>
+                <td style="text-align:right" class="discount-val">- {{ number_format($offer->discount_amount, 0, ',', '.') }} ₺</td>
+                <td style="text-align:right" class="discount-val">- {{ number_format($offer->discount_amount, 0, ',', '.') }} ₺</td>
             </tr>
             @endif
-            <tr>
-                <th class="final-price">Net Fiyat (KDV Dahil):</th>
-                <td class="final-price">{{ number_format($offer->final_price, 2, ',', '.') }} ₺</td>
+            <tr class="total-row">
+                <td colspan="2">Net Teklif Fiyatı (KDV Hariç)</td>
+                <td class="net-val">{{ number_format($offer->final_price, 0, ',', '.') }} ₺</td>
             </tr>
-        </table>
-        <div class="clear"></div>
-    </div>
+        </tbody>
+    </table>
 
+    {{-- ══ GEÇERLİLİK ═══════════════════════════════════════ --}}
+    @if($offer->valid_until)
+    <div class="validity-bar" style="margin-top:4mm">
+        <span class="label">Bu teklif aşağıdaki tarihe kadar geçerlidir:</span>
+        <span class="val">{{ \Carbon\Carbon::parse($offer->valid_until)->format('d.m.Y') }}</span>
+    </div>
+    @endif
+
+    {{-- ══ ÖDEME PLANI ══════════════════════════════════════ --}}
     @if($offer->payment_plan)
-    <div class="section">
-        <div class="section-title">Ödeme Planı</div>
-        <p style="font-size: 13px; line-height: 1.6;">
-            {!! nl2br(e($offer->payment_plan)) !!}
-        </p>
+    <div class="section-title" style="margin-top:5mm">Ödeme Planı</div>
+    <div class="text-block">
+        <p>{{ $offer->payment_plan }}</p>
     </div>
     @endif
 
+    {{-- ══ NOTLAR ═══════════════════════════════════════════ --}}
     @if($offer->notes)
-    <div class="notes-section">
-        <strong>Genel Şartlar ve Notlar:</strong><br>
-        {!! nl2br(e($offer->notes)) !!}
+    <div class="section-title">Notlar ve Özel Koşullar</div>
+    <div class="text-block">
+        <p>{{ $offer->notes }}</p>
     </div>
     @endif
 
-    <div class="signatures">
-        <div class="signature-box">
-            <b>MÜŞTERİ ONAYI</b>
-            <div class="signature-line">Ad, Soyad / İmza</div>
+    {{-- ══ İMZA ════════════════════════════════════════════ --}}
+    <div class="sig-grid">
+        <div class="sig-box">
+            <div class="sig-line">
+                <span class="sig-label">Müşteri Adı Soyadı / İmza</span>
+            </div>
         </div>
-        <div class="signature-box right">
-            <b>SATIŞ TEMSİLCİSİ</b>
-            <div class="signature-line">{{ $offer->creator->name ?? 'İmza' }}</div>
+        <div class="sig-box">
+            <div class="sig-line">
+                <span class="sig-label">Yetkili Temsilci / İmza</span>
+            </div>
         </div>
-        <div class="clear"></div>
+        <div class="sig-box">
+            <div class="sig-line">
+                <span class="sig-label">Tarih</span>
+            </div>
+        </div>
     </div>
 
+    {{-- ══ FOOTER ═══════════════════════════════════════════ --}}
     <div class="footer">
-        Bu belge sistem tarafından {{ now()->format('d.m.Y H:i') }} tarihinde elektronik olarak üretilmiştir. / Belcon Core ERP
+        <div class="footer-left">
+            @if($offer->project)
+            @php $p = $offer->project; @endphp
+            <div class="footer-brand">{{ $p->company_name ?? $p->name }}</div>
+            @if($p->company_address)<div>{{ $p->company_address }}</div>@endif
+            @if($p->company_phone)<div>Tel: {{ $p->company_phone }}{{ $p->company_email ? '  |  ' . $p->company_email : '' }}</div>@endif
+            @if($p->tax_number)<div>VKN: {{ $p->tax_number }} / {{ $p->tax_office }}</div>@endif
+            @endif
+        </div>
+        <div class="footer-right">
+            <div>Bu belge elektronik ortamda oluşturulmuştur.</div>
+            <div>{{ $offer->offer_no }} &nbsp;·&nbsp; {{ now()->format('d.m.Y') }}</div>
+        </div>
     </div>
 
+</div>
 </body>
 </html>

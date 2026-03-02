@@ -130,7 +130,7 @@ export function OfferDetailPanel({ offer, open, onClose, onUpdated }: OfferDetai
                     </SheetHeader>
                 </div>
 
-                <ScrollArea className="flex-1">
+                <div className="flex-1 overflow-y-auto min-h-0">
                     <div className="p-5 space-y-4">
 
                         {/* Pricing Card */}
@@ -237,7 +237,7 @@ export function OfferDetailPanel({ offer, open, onClose, onUpdated }: OfferDetai
                             </div>
                         )}
                     </div>
-                </ScrollArea>
+                </div>
 
                 {/* Footer Actions */}
                 <div className="bg-white border-t px-5 py-4 flex gap-3 shrink-0">

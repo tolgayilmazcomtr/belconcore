@@ -14,6 +14,14 @@ class Project extends Model
         'end_date',
         'planned_budget',
         'status',
+        'logo_path',
+        'company_name',
+        'company_phone',
+        'company_email',
+        'company_address',
+        'company_website',
+        'tax_office',
+        'tax_number',
     ];
 
     public function users()
