@@ -6,7 +6,8 @@ import { useCrmStore } from '@/store/useCrmStore';
 import api from '@/lib/api';
 import { OfferList } from '@/components/crm/OfferList';
 import { OfferDetailPanel } from '@/components/crm/OfferDetailPanel';
-import { Loader2, FileText, CheckCircle2, XCircle, Clock, SendHorizonal } from 'lucide-react';
+import { StandaloneOfferCreateModal } from '@/components/crm/StandaloneOfferCreateModal';
+import { Loader2, FileText, CheckCircle2, XCircle, Clock, SendHorizonal, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 import { Offer } from '@/types/project.types';
 
@@ -90,6 +91,9 @@ export default function OffersPage() {
                         Müşterilere sunulan teklifleri ve PDF belgelerini yönetin.
                     </p>
                 </div>
+                <StandaloneOfferCreateModal
+                    onSuccess={() => api.get('/offers').then(r => setOffers(r.data.data)).catch(() => { })}
+                />
             </div>
 
             {/* Stats Cards */}

@@ -12,9 +12,10 @@ import {
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { Target, User, Building, MapPin, SearchCheck, AlignLeft, FileText, Download, Calendar } from 'lucide-react';
+import { Target, User, Building, MapPin, SearchCheck, AlignLeft, FileText, Download, Calendar, Pencil } from 'lucide-react';
 import { useCrmStore } from '@/store/useCrmStore';
 import { OfferCreateModal } from '@/components/crm/OfferCreateModal';
+import { LeadCreateModal } from '@/components/crm/LeadCreateModal';
 import { Button } from '@/components/ui/button';
 import api from '@/lib/api';
 
@@ -92,6 +93,17 @@ export function LeadDetailPanel({ lead, open, onClose }: LeadDetailPanelProps) {
                             </div>
                         </div>
                     </SheetHeader>
+                    {/* Edit button */}
+                    <div className="mt-3 flex justify-end">
+                        <LeadCreateModal
+                            editLead={lead}
+                            trigger={
+                                <Button variant="outline" size="sm" className="gap-1.5">
+                                    <Pencil className="w-3.5 h-3.5" /> Fırsatı Düzenle
+                                </Button>
+                            }
+                        />
+                    </div>
                 </div>
 
                 <div className="flex-1 overflow-hidden flex flex-col bg-slate-50">
