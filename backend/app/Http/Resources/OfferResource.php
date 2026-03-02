@@ -27,6 +27,7 @@ class OfferResource extends JsonResource
             
             'customer' => new CustomerResource($this->whenLoaded('customer')),
             'lead' => new LeadResource($this->whenLoaded('lead')),
+            'unit' => new UnitResource($this->whenLoaded('unit')),
             'creator' => new UserResource($this->whenLoaded('creator')),
             
             'created_at' => $this->created_at,

@@ -12,7 +12,7 @@ class OfferController extends Controller
 {
     public function index(Request $request)
     {
-        $query = Offer::with(['customer', 'lead', 'unit', 'creator']);
+        $query = Offer::with(['customer', 'lead', 'unit.block', 'creator']);
 
         if ($request->has('lead_id')) {
             $query->where('lead_id', $request->query('lead_id'));

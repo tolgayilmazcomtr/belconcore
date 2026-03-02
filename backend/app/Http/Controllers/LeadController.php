@@ -34,9 +34,11 @@ class LeadController extends Controller
             'status' => 'nullable|string|in:new,contacted,qualified,proposal,won,lost',
             'expected_value' => 'nullable|numeric',
             'assigned_to' => 'nullable|exists:users,id',
+            'active_project_id' => 'required|exists:projects,id',
         ]);
 
-        $data['project_id'] = $request->active_project_id;
+        $data['project_id'] = $data['active_project_id'];
+        unset($data['active_project_id']);
 
         $lead = Lead::create($data);
         $lead->load(['customer', 'assignee', 'unit']);
@@ -61,7 +63,13 @@ class LeadController extends Controller
             'status' => 'nullable|string|in:new,contacted,qualified,proposal,won,lost',
             'expected_value' => 'nullable|numeric',
             'assigned_to' => 'nullable|exists:users,id',
+            'active_project_id' => 'nullable|exists:projects,id',
         ]);
+
+        if (isset($data['active_project_id'])) {
+            $data['project_id'] = $data['active_project_id'];
+            unset($data['active_project_id']);
+        }
 
         $lead->update($data);
         $lead->load(['customer', 'assignee', 'unit']);
