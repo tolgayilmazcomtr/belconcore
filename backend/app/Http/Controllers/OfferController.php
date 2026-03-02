@@ -35,7 +35,7 @@ class OfferController extends Controller
             'base_price' => 'required|numeric',
             'discount_amount' => 'nullable|numeric',
             'final_price' => 'required|numeric',
-            'payment_plan' => 'nullable|array',
+            'payment_plan' => 'nullable|string',
             'notes' => 'nullable|string',
         ]);
 
@@ -65,7 +65,7 @@ class OfferController extends Controller
             'base_price' => 'nullable|numeric',
             'discount_amount' => 'nullable|numeric',
             'final_price' => 'nullable|numeric',
-            'payment_plan' => 'nullable|array',
+            'payment_plan' => 'nullable|string',
             'notes' => 'nullable|string',
         ]);
 

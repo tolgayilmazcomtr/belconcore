@@ -14,7 +14,6 @@ class Offer extends Model
 
     protected $casts = [
         'valid_until' => 'date',
-        'payment_plan' => 'array',
         'base_price' => 'decimal:2',
         'discount_amount' => 'decimal:2',
         'final_price' => 'decimal:2',
