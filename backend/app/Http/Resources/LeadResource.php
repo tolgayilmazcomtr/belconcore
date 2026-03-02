@@ -23,9 +23,7 @@ class LeadResource extends JsonResource
             
             'customer' => new CustomerResource($this->whenLoaded('customer')),
             'assignee' => new UserResource($this->whenLoaded('assignee')),
-            // 'unit' => new UnitResource($this->whenLoaded('unit')),
-            // note: UnitResource wasn't in scope yet, let's keep it simple
-            'unit' => $this->whenLoaded('unit'),
+            'unit' => new UnitResource($this->whenLoaded('unit')),
             
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,
