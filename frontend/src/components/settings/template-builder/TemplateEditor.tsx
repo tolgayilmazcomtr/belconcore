@@ -162,13 +162,14 @@ function PageSettingsPanel({ settings, onChange, projectId }: {
         try {
             const fd = new FormData();
             fd.append('logo', file);
-            const res = await api.post(`/projects/${projectId}/logo`, fd, {
-                headers: { 'Content-Type': 'multipart/form-data' },
-            });
+            // NOTE: Do NOT set Content-Type manually — axios sets it with boundary automatically
+            const res = await api.post(`/projects/${projectId}/logo`, fd);
             setLogoUrl(res.data.logo_url);
             toast.success('Logo yüklendi!');
-        } catch {
-            toast.error('Logo yüklenemedi.');
+        } catch (err: unknown) {
+            const status = (err as { response?: { status?: number } })?.response?.status;
+            toast.error(`Logo yüklenemedi.${status ? ` (${status})` : ''}`);
+            console.error('Logo upload error:', err);
         } finally {
             setLogoUploading(false);
             if (fileInputRef.current) fileInputRef.current.value = '';

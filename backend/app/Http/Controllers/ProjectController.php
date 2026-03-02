@@ -88,10 +88,14 @@ class ProjectController extends Controller
 
     public function uploadLogo(Request $request, string $id)
     {
-        $request->validate(['logo' => 'required|image|mimes:jpeg,png,jpg,gif,svg,webp|max:2048']);
+        $request->validate([
+            // 'image' rule rejects SVG — use 'file|mimes:' for broader support
+            'logo' => 'required|file|mimes:jpeg,png,jpg,gif,svg,webp|max:4096',
+        ]);
 
         $project = \App\Models\Project::findOrFail($id);
 
+        // Delete previous logo if it exists
         if ($project->logo_path && Storage::disk('public')->exists($project->logo_path)) {
             Storage::disk('public')->delete($project->logo_path);
         }
@@ -99,10 +103,13 @@ class ProjectController extends Controller
         $path = $request->file('logo')->store('logos', 'public');
         $project->update(['logo_path' => $path]);
 
+        // Build absolute URL so the browser can display it
+        $logoUrl = url(Storage::url($path));
+
         return response()->json([
-            'message' => 'Logo yüklendi.',
-            'logo_url' => Storage::disk('public')->url($path),
-            'data' => $project,
+            'message'  => 'Logo yüklendi.',
+            'logo_url' => $logoUrl,
+            'data'     => $project,
         ]);
     }
 
