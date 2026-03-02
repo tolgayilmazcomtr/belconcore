@@ -11,6 +11,9 @@ use App\Http\Controllers\LeadController;
 use App\Http\Controllers\ActivityController;
 use App\Http\Controllers\OfferController;
 use App\Http\Controllers\TemplateConfigController;
+use App\Http\Controllers\AccountingAccountController;
+use App\Http\Controllers\InvoiceController;
+use App\Http\Controllers\AccountingPaymentController;
 
 // Public Auth Routes
 Route::post('/login', [AuthController::class, 'login']);
@@ -43,6 +46,13 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::apiResource('activities', ActivityController::class);
         
         Route::apiResource('offers', OfferController::class);
+
+        // Muhasebe (Accounting)
+        Route::apiResource('accounting/accounts', AccountingAccountController::class);
+        Route::apiResource('accounting/invoices', InvoiceController::class);
+        Route::get('accounting/payments', [AccountingPaymentController::class, 'index']);
+        Route::post('accounting/payments', [AccountingPaymentController::class, 'store']);
+        Route::delete('accounting/payments/{id}', [AccountingPaymentController::class, 'destroy']);
         });
 
     // Şablon Editörü

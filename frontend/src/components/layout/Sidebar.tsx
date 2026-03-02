@@ -72,7 +72,17 @@ export function Sidebar() {
           <SidebarSubItem icon={<PieChart size={16} />} label="Fırsatlar" href="/crm" collapsed={collapsed} />
           <SidebarSubItem icon={<FileText size={16} />} label="Teklifler" href="/offers" collapsed={collapsed} />
         </SidebarExpandableItem>
-        <SidebarItem icon={<WalletCards size={20} className="shrink-0" />} label="Ön Muhasebe" href="/accounting" collapsed={collapsed} />
+        <SidebarExpandableItem
+          icon={<WalletCards size={20} className="shrink-0" />}
+          label="Muhasebe"
+          collapsed={collapsed}
+          activePaths={["/accounting"]}
+        >
+          <SidebarSubItem icon={<Users size={16} />} label="Cariler" href="/accounting/accounts" collapsed={collapsed} />
+          <SidebarSubItem icon={<FileText size={16} />} label="Satışlar" href="/accounting/sales" collapsed={collapsed} />
+          <SidebarSubItem icon={<FileText size={16} />} label="Alışlar" href="/accounting/purchases" collapsed={collapsed} />
+          <SidebarSubItem icon={<WalletCards size={16} />} label="Kasa ve Bankalar" href="/accounting/finance" collapsed={collapsed} />
+        </SidebarExpandableItem>
         <SidebarItem icon={<Warehouse size={20} className="shrink-0" />} label="Stok & Maliyet" href="/inventory" collapsed={collapsed} />
         <SidebarItem icon={<HardHat size={20} className="shrink-0" />} label="Şantiye İlerleme" href="/site-progress" collapsed={collapsed} />
         <SidebarItem icon={<PieChart size={20} className="shrink-0" />} label="Raporlar" href="/reports" collapsed={collapsed} />
