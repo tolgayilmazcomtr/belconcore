@@ -93,8 +93,8 @@ export function LeadCreateModal({ editLead, trigger }: LeadCreateModalProps) {
 
         const payload = {
             ...formData,
-            customer_id: formData.customer_id ? parseInt(formData.customer_id) : null,
-            unit_id: formData.unit_id ? parseInt(formData.unit_id) : null,
+            customer_id: formData.customer_id && formData.customer_id !== 'none' ? parseInt(formData.customer_id) : null,
+            unit_id: formData.unit_id && formData.unit_id !== 'none' ? parseInt(formData.unit_id) : null,
             expected_value: formData.expected_value ? parseFloat(formData.expected_value) : null,
             active_project_id: activeProject.id
         };
