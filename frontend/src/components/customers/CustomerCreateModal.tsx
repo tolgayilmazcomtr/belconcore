@@ -98,12 +98,17 @@ export function CustomerCreateModal({ editCustomer, trigger }: CustomerCreateMod
         setIsLoading(true);
 
         try {
+            const payload = {
+                ...formData,
+                active_project_id: activeProject.id
+            };
+
             if (editCustomer) {
-                const response = await api.put(`/customers/${editCustomer.id}`, formData);
+                const response = await api.put(`/customers/${editCustomer.id}`, payload);
                 setCustomers(customers.map(c => c.id === editCustomer.id ? response.data.data : c));
                 toast.success('Müşteri başarıyla güncellendi.');
             } else {
-                const response = await api.post('/customers', formData);
+                const response = await api.post('/customers', payload);
                 setCustomers([...customers, response.data.data]);
                 toast.success('Yeni müşteri başarıyla oluşturuldu.');
             }
