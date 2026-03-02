@@ -52,7 +52,9 @@ export function LeadCreateModal({ editLead, trigger }: LeadCreateModalProps) {
     useEffect(() => {
         if (activeProject && isOpen) {
             // Fetch units for the project to link to lead
-            api.get('/units').then(res => setUnits(res.data.data)).catch(() => { });
+            api.get('/units', {
+                params: { active_project_id: activeProject.id }
+            }).then(res => setUnits(res.data.data)).catch(() => { });
         }
     }, [activeProject, isOpen]);
 
@@ -94,6 +96,7 @@ export function LeadCreateModal({ editLead, trigger }: LeadCreateModalProps) {
             customer_id: formData.customer_id ? parseInt(formData.customer_id) : null,
             unit_id: formData.unit_id ? parseInt(formData.unit_id) : null,
             expected_value: formData.expected_value ? parseFloat(formData.expected_value) : null,
+            active_project_id: activeProject.id
         };
 
         try {
