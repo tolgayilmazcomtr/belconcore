@@ -31,10 +31,10 @@ export function BlockSettingsPanel({ block, onUpdate, onRemove }: BlockSettingsP
             {/* Header */}
             <div className="flex items-center justify-between px-4 py-3 border-b bg-slate-50 shrink-0">
                 <div className="flex items-center gap-2">
-                    <span className="text-lg">{meta.icon}</span>
+                    <div className="shrink-0 text-slate-400"><Settings2 size={14} /></div>
                     <div>
-                        <p className="text-sm font-semibold text-slate-800">{meta.label}</p>
-                        <p className="text-xs text-slate-400">{meta.description}</p>
+                        <p className="text-xs font-semibold text-slate-800">{meta.label}</p>
+                        <p className="text-[10px] text-slate-400 leading-tight">{meta.description}</p>
                     </div>
                 </div>
                 <button

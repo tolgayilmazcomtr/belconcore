@@ -5,7 +5,7 @@ import { useDraggable } from '@dnd-kit/core';
 import {
     Image, Building2, User, FileText, LayoutGrid, Home,
     Table2, CalendarClock, CreditCard, StickyNote, PenLine,
-    Minus, Type, AlignBottom, ChevronRight,
+    Minus, Type, PanelBottom, ChevronRight,
 } from 'lucide-react';
 import { BLOCK_CATALOGUE, CATEGORY_LABELS, BlockType } from './types';
 
@@ -24,7 +24,7 @@ const BLOCK_ICONS: Record<string, React.ElementType> = {
     SignatureBlock: PenLine,
     DividerBlock: Minus,
     TextBlock: Type,
-    FooterBlock: AlignBottom,
+    FooterBlock: PanelBottom,
 };
 
 interface BlockPaletteProps {
