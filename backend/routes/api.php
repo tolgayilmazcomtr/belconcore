@@ -26,7 +26,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('projects', ProjectController::class);
 
     // Seçili Proje İçi Modüller (Blok ve Bağımsız Bölüm)
-    Route::middleware('project.access')->group(function () {
+    // Offer PDF - project.access dışında, doğrudan auth ile erişilir
+        Route::get('offers/{offer}/pdf', [OfferController::class, 'generatePdf']);
+
+        Route::middleware('project.access')->group(function () {
         Route::apiResource('blocks', BlockController::class);
         Route::post('units/bulk', [UnitController::class, 'storeBulk']);
         Route::apiResource('units', UnitController::class);
@@ -37,7 +40,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::apiResource('leads', LeadController::class);
         Route::apiResource('activities', ActivityController::class);
         
-        Route::get('offers/{offer}/pdf', [OfferController::class, 'generatePdf']);
         Route::apiResource('offers', OfferController::class);
-    });
+        });
+
 });

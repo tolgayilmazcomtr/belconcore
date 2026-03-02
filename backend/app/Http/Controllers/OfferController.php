@@ -75,15 +75,21 @@ class OfferController extends Controller
         return new OfferResource($offer);
     }
 
-    public function generatePdf(Request $request, Offer $offer)
+    public function generatePdf(Request $request, int $offer)
     {
-        $offer->load(['customer', 'lead', 'unit.block', 'creator', 'project']);
+        // Bypass ProjectScope since this route is accessed directly via browser (no active_project_id header)
+        $offerModel = Offer::withoutGlobalScopes()->with(['customer', 'lead', 'unit.block', 'creator', 'project'])->findOrFail($offer);
 
-        $pdf = Pdf::loadView('pdf.offer_template', compact('offer'));
+        // Security: make sure the authenticated user can access this project
+        $user = $request->user();
+        if (!$user->hasRole('Admin') && !$user->projects()->where('project_id', $offerModel->project_id)->exists()) {
+            abort(403, 'Bu teklife erişim yetkiniz bulunmuyor.');
+        }
 
+        $pdf = Pdf::loadView('pdf.offer_template', ['offer' => $offerModel]);
         $pdf->setPaper('A4', 'portrait');
 
-        return $pdf->download("Teklif_{$offer->offer_no}.pdf");
+        return $pdf->download("Teklif_{$offerModel->offer_no}.pdf");
     }
 
     public function destroy(Offer $offer)
