@@ -10,6 +10,7 @@ use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\LeadController;
 use App\Http\Controllers\ActivityController;
 use App\Http\Controllers\OfferController;
+use App\Http\Controllers\TemplateConfigController;
 
 // Public Auth Routes
 Route::post('/login', [AuthController::class, 'login']);
@@ -43,5 +44,9 @@ Route::middleware('auth:sanctum')->group(function () {
         
         Route::apiResource('offers', OfferController::class);
         });
+
+    // Şablon Editörü
+    Route::get('template-configs/{type}', [TemplateConfigController::class, 'show']);
+    Route::post('template-configs', [TemplateConfigController::class, 'store']);
 
 });

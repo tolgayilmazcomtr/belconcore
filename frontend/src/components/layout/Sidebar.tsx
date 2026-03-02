@@ -15,7 +15,9 @@ import {
   ChevronRight,
   ChevronDown,
   Building,
-  Home
+  Home,
+  Settings2,
+  LayoutTemplate,
 } from "lucide-react";
 import { usePathname } from "next/navigation";
 
@@ -74,6 +76,15 @@ export function Sidebar() {
         <SidebarItem icon={<Warehouse size={20} className="shrink-0" />} label="Stok & Maliyet" href="/inventory" collapsed={collapsed} />
         <SidebarItem icon={<HardHat size={20} className="shrink-0" />} label="Şantiye İlerleme" href="/site-progress" collapsed={collapsed} />
         <SidebarItem icon={<PieChart size={20} className="shrink-0" />} label="Raporlar" href="/reports" collapsed={collapsed} />
+
+        <SidebarExpandableItem
+          icon={<Settings2 size={20} className="shrink-0" />}
+          label="Sistem Ayarları"
+          collapsed={collapsed}
+          activePaths={["/settings"]}
+        >
+          <SidebarSubItem icon={<LayoutTemplate size={16} />} label="Şablon Editörü" href="/settings/templates" collapsed={collapsed} />
+        </SidebarExpandableItem>
       </nav>
 
       <div className={`p-4 border-t border-sidebar-border text-xs text-muted-foreground whitespace-nowrap overflow-hidden transition-all ${collapsed ? 'text-center opacity-0 h-0 hidden' : 'text-center opacity-100'}`}>
