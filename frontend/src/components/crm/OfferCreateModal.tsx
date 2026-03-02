@@ -65,7 +65,9 @@ export function OfferCreateModal({ lead, editOffer, trigger, onSuccess }: OfferC
 
     useEffect(() => {
         if (activeProject && isOpen) {
-            api.get('/units').then(res => setUnits(res.data.data)).catch(() => { });
+            api.get('/units', {
+                params: { active_project_id: activeProject.id }
+            }).then(res => setUnits(res.data.data)).catch(() => { });
         }
     }, [activeProject, isOpen]);
 
@@ -127,6 +129,7 @@ export function OfferCreateModal({ lead, editOffer, trigger, onSuccess }: OfferC
             base_price: parseFloat(formData.base_price) || 0,
             discount_amount: parseFloat(formData.discount_amount) || 0,
             final_price: parseFloat(formData.final_price) || 0,
+            active_project_id: activeProject.id
         };
 
         try {
