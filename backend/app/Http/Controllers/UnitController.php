@@ -18,7 +18,7 @@ class UnitController extends Controller
             $query->where('block_id', $request->block_id);
         }
 
-        return response()->json($query->paginate(30));
+        return response()->json($query->get());
     }
 
     public function store(Request $request)
