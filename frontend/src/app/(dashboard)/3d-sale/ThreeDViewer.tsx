@@ -101,6 +101,9 @@ export default function ThreeDViewer() {
         setView: (name: string) => void;
     } | null>(null);
 
+    // Persist camera position across Three.js scene rebuilds
+    const camStateRef = useRef({ theta: -Math.PI * 0.75, phi: 0.75, r: 26, tx: 0, ty: 3, tz: 0 });
+
     // Load blocks + units dynamically
     useEffect(() => {
         if (!activeProject) { setIsFetching(false); return; }
@@ -471,9 +474,11 @@ export default function ThreeDViewer() {
         buildBuildings();
         addLabels();
 
-        // Camera Orbit
-        let camTheta = -Math.PI * 0.75, camPhi = 0.75, camR = 26;
-        const camTarget = new THREE.Vector3(0, 3, 0);
+        // Camera Orbit - restore from ref to preserve position across rebuilds
+        let camTheta = camStateRef.current.theta;
+        let camPhi = camStateRef.current.phi;
+        let camR = camStateRef.current.r;
+        const camTarget = new THREE.Vector3(camStateRef.current.tx, camStateRef.current.ty, camStateRef.current.tz);
         let isDragging = false, isRightDrag = false;
         let lastMX = 0, lastMY = 0, downMX = 0, downMY = 0, wasDrag = false;
 
@@ -491,6 +496,8 @@ export default function ThreeDViewer() {
             const z = camR * Math.sin(camPhi) * Math.cos(camTheta) + camTarget.z;
             camera.position.set(x, y, z);
             camera.lookAt(camTarget);
+            // Persist for next rebuild
+            camStateRef.current = { theta: camTheta, phi: camPhi, r: camR, tx: camTarget.x, ty: camTarget.y, tz: camTarget.z };
         }
         updateCamera();
 
