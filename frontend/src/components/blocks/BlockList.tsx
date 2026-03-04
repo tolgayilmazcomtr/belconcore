@@ -12,7 +12,7 @@ import {
 } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Download, ChevronsUpDown, Search, MoreHorizontal, Edit2, Trash2 } from 'lucide-react';
+import { Download, ChevronsUpDown, Search, MoreHorizontal, Edit2, Trash2, Wand2 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import {
     useReactTable,
@@ -33,6 +33,7 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { BlockCreateModal } from './BlockCreateModal';
+import { UnitWizardModal } from '../units/UnitWizardModal';
 import api from '@/lib/api';
 import { toast } from 'sonner';
 import { useProjectStore } from '@/store/useProjectStore';
@@ -177,6 +178,15 @@ export function BlockList({ blocks, projectName }: BlockListProps) {
                                         <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="cursor-pointer">
                                             <Edit2 className="mr-2 h-4 w-4" />
                                             <span>Düzenle</span>
+                                        </DropdownMenuItem>
+                                    }
+                                />
+                                <UnitWizardModal
+                                    block={block}
+                                    trigger={
+                                        <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="cursor-pointer text-primary focus:text-primary focus:bg-primary/5">
+                                            <Wand2 className="mr-2 h-4 w-4" />
+                                            <span>Ünite Sihirbazı</span>
                                         </DropdownMenuItem>
                                     }
                                 />
