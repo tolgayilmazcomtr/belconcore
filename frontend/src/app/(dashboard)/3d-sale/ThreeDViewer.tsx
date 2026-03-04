@@ -213,6 +213,16 @@ export default function ThreeDViewer() {
         setTimeout(() => setToastMsg(''), 2800);
     };
 
+    // Her iki state'i senkronize güncelle: layout editorde anlık 3D önizleme
+    const updateBlockLayout = (blkId: number, updates: Partial<import('@/types/project.types').Block>) => {
+        setLayoutBlocks(prev => prev.map(b => b.id === blkId ? { ...b, ...updates } : b));
+        setBlockConfigs(prev => prev.map(cfg =>
+            cfg.block.id === blkId
+                ? { ...cfg, block: { ...cfg.block, ...updates } }
+                : cfg
+        ));
+    };
+
     // ============================================================
     // THREE.js Initialization
     // ============================================================
@@ -809,7 +819,7 @@ export default function ThreeDViewer() {
                                                 <input
                                                     type="number" step="0.5"
                                                     value={blk.scene_x ?? 0}
-                                                    onChange={e => setLayoutBlocks(prev => prev.map(b => b.id === blk.id ? { ...b, scene_x: parseFloat(e.target.value) } : b))}
+                                                    onChange={e => updateBlockLayout(blk.id, { scene_x: parseFloat(e.target.value) })}
                                                     className="w-full border rounded px-2 py-1 text-xs font-mono"
                                                 />
                                             </div>
@@ -818,7 +828,7 @@ export default function ThreeDViewer() {
                                                 <input
                                                     type="number" step="0.5"
                                                     value={blk.scene_z ?? 0}
-                                                    onChange={e => setLayoutBlocks(prev => prev.map(b => b.id === blk.id ? { ...b, scene_z: parseFloat(e.target.value) } : b))}
+                                                    onChange={e => updateBlockLayout(blk.id, { scene_z: parseFloat(e.target.value) })}
                                                     className="w-full border rounded px-2 py-1 text-xs font-mono"
                                                 />
                                             </div>
@@ -827,7 +837,7 @@ export default function ThreeDViewer() {
                                                 <input
                                                     type="number" step="5" min="0" max="360"
                                                     value={blk.scene_angle ?? 0}
-                                                    onChange={e => setLayoutBlocks(prev => prev.map(b => b.id === blk.id ? { ...b, scene_angle: parseFloat(e.target.value) } : b))}
+                                                    onChange={e => updateBlockLayout(blk.id, { scene_angle: parseFloat(e.target.value) })}
                                                     className="w-full border rounded px-2 py-1 text-xs font-mono"
                                                 />
                                             </div>
@@ -839,7 +849,7 @@ export default function ThreeDViewer() {
                                                 <input
                                                     type="number" min="1" max="20" step="1"
                                                     value={blk.faces_per_row ?? 4}
-                                                    onChange={e => setLayoutBlocks(prev => prev.map(b => b.id === blk.id ? { ...b, faces_per_row: parseInt(e.target.value) } : b))}
+                                                    onChange={e => updateBlockLayout(blk.id, { faces_per_row: parseInt(e.target.value) })}
                                                     className="w-20 border rounded px-2 py-1 text-xs font-mono"
                                                 />
                                                 <span className="text-[10px] text-slate-400">
