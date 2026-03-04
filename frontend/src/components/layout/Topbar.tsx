@@ -1,6 +1,6 @@
 "use client";
 
-import { Bell, Search, UserCircle, Settings, LogOut } from "lucide-react";
+import { Bell, Search, UserCircle, Settings, LogOut, Menu } from "lucide-react";
 import { ProjectSelector } from "./ProjectSelector";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuthStore } from "@/store/useAuthStore";
@@ -28,8 +28,16 @@ export function Topbar() {
 
     return (
         <header className="h-[52px] flex items-center justify-between px-3 bg-primary text-white shadow-sm shrink-0 gap-2 overflow-hidden">
-            {/* Sol: Arama + Proje Seçici */}
+            {/* Sol: Hamburger (mobil) + Arama + Proje Seçici */}
             <div className="flex items-center gap-2 min-w-0 flex-1">
+                {/* Hamburger - sadece mobilde */}
+                <button
+                    className="md:hidden p-1.5 rounded hover:bg-white/20 transition-colors shrink-0"
+                    onClick={() => window.dispatchEvent(new CustomEvent('toggle-mobile-sidebar'))}
+                    aria-label="Menü"
+                >
+                    <Menu size={20} />
+                </button>
                 {/* Arama kutusu - sadece masaüstünde */}
                 <div className="hidden md:flex items-center bg-white/10 rounded px-2.5 py-1.5 w-72 border border-white/20 focus-within:bg-white/20 transition-colors shrink-0">
                     <Search size={16} className="text-white/90 mr-2" />

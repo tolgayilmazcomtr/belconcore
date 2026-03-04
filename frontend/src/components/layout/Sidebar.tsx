@@ -316,6 +316,13 @@ export function Sidebar() {
 
   useEffect(() => { setMobileOpen(false); }, [pathname]);
 
+  // Topbar'daki hamburger butonu 'toggle-mobile-sidebar' event'i gönderiyor
+  useEffect(() => {
+    const handler = () => setMobileOpen(o => !o);
+    window.addEventListener('toggle-mobile-sidebar', handler);
+    return () => window.removeEventListener('toggle-mobile-sidebar', handler);
+  }, []);
+
   if (pathname === "/login") return null;
 
   const sidebarContent = (isMobile = false) => (
@@ -378,11 +385,6 @@ export function Sidebar() {
 
   return (
     <>
-      {/* Mobile hamburger */}
-      <button onClick={() => setMobileOpen(true)}
-        className="md:hidden fixed top-3 left-3 z-50 bg-white border border-slate-200 rounded-lg p-2 shadow-sm text-slate-600">
-        <Menu size={18} />
-      </button>
 
       {/* Mobile overlay */}
       {mobileOpen && (
