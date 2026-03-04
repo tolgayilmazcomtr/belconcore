@@ -30,7 +30,7 @@ import { Plus, Loader2, Edit2 } from "lucide-react"
 import { Block } from "@/types/project.types"
 
 const formSchema = z.object({
-    name: z.string().min(2, "Blok adı en az 2 karakter olmalıdır"),
+    name: z.string().min(1, "Blok adı boş bırakılamaz"),
     code: z.string().optional(),
     parcel_island: z.string().optional(),
 })

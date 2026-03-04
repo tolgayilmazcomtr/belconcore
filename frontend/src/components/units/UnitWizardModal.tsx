@@ -24,8 +24,9 @@ interface FloorDef {
 
 interface FaceDef {
     code: string;       // e.g. "CK"
-    direction: string;  // e.g. "Çevre Yolu + Kale (Batı)"
+    direction: string;  // e.g. "Göl + Kale (Batı)"
     unit_type: string;  // e.g. "3+1"
+    compass: string;    // e.g. "Kuzey-Batı"
 }
 
 interface GeneratedUnit {
@@ -45,16 +46,48 @@ interface UnitWizardModalProps {
 // ============================================================
 // Helpers
 // ============================================================
-const COMPASS_DIRECTIONS = [
-    { value: "Kuzey", label: "Kuzey (K)" },
-    { value: "Güney", label: "Güney (G)" },
-    { value: "Doğu", label: "Doğu (D)" },
-    { value: "Batı", label: "Batı (B)" },
-    { value: "Kuzey-Doğu", label: "Kuzey-Doğu (KD)" },
-    { value: "Kuzey-Batı", label: "Kuzey-Batı (KB)" },
-    { value: "Güney-Doğu", label: "Güney-Doğu (GD)" },
-    { value: "Güney-Batı", label: "Güney-Batı (GB)" },
+const COMPASS_DIRS = [
+    { key: "K", label: "Kuzey", deg: 0 },
+    { key: "KD", label: "Kuzey-Doğu", deg: 45 },
+    { key: "D", label: "Doğu", deg: 90 },
+    { key: "GD", label: "Güney-Doğu", deg: 135 },
+    { key: "G", label: "Güney", deg: 180 },
+    { key: "GB", label: "Güney-Batı", deg: 225 },
+    { key: "B", label: "Batı", deg: 270 },
+    { key: "KB", label: "Kuzey-Batı", deg: 315 },
 ];
+
+function CompassPicker({ selected, onChange }: { selected: string; onChange: (key: string, label: string) => void }) {
+    const size = 80;
+    const center = size / 2;
+    const r = 30;
+    return (
+        <div className="relative" style={{ width: size, height: size }}>
+            {/* Center dot */}
+            <div className="absolute w-2 h-2 bg-slate-300 rounded-full" style={{ left: center - 4, top: center - 4 }} />
+            {COMPASS_DIRS.map(d => {
+                const rad = (d.deg - 90) * (Math.PI / 180);
+                const x = center + r * Math.cos(rad);
+                const y = center + r * Math.sin(rad);
+                const isSelected = selected === d.key;
+                return (
+                    <button
+                        key={d.key}
+                        title={d.label}
+                        onClick={() => onChange(d.key, d.label)}
+                        className={`absolute flex items-center justify-center rounded-full text-[9px] font-bold border transition-all ${isSelected
+                            ? "bg-primary border-primary text-white shadow-md scale-110"
+                            : "bg-white border-slate-300 text-slate-500 hover:border-primary hover:text-primary"
+                            }`}
+                        style={{ width: 20, height: 20, left: x - 10, top: y - 10 }}
+                    >
+                        {d.key}
+                    </button>
+                );
+            })}
+        </div>
+    );
+}
 
 function generateFloors(
     hasBasement: boolean,
@@ -82,6 +115,8 @@ function generateFloors(
 function generateUnits(blockCode: string, floors: FloorDef[], faces: FaceDef[], blockId: number): GeneratedUnit[] {
     const result: GeneratedUnit[] = [];
     for (const floor of floors) {
+        // Bodrum katlarda daire oluşturulmaz (otopark/depo)
+        if (floor.isBasement) continue;
         for (const face of faces) {
             const floorTag = floor.floor_no === "0" ? "Z" : floor.floor_no;
             const unit_no = `${blockCode}${floorTag}${face.code}`;
@@ -115,10 +150,10 @@ export function UnitWizardModal({ block, trigger, onSuccess }: UnitWizardModalPr
 
     // Step 2 State
     const [faces, setFaces] = useState<FaceDef[]>([
-        { code: "CK", direction: "Çevre Yolu + Kale (Batı)", unit_type: "3+1" },
-        { code: "CE", direction: "Çevre Yolu + Edremit (Güney)", unit_type: "2+1" },
-        { code: "GK", direction: "Göl + Kale (Kuzey)", unit_type: "3+1" },
-        { code: "GE", direction: "Göl + Edremit (Doğu)", unit_type: "2+1" },
+        { code: "CK", direction: "Çevre Yolu + Kale (Batı)", unit_type: "3+1", compass: "B" },
+        { code: "CE", direction: "Çevre Yolu + Edremit (Güney)", unit_type: "2+1", compass: "G" },
+        { code: "GK", direction: "Göl + Kale (Kuzey)", unit_type: "3+1", compass: "K" },
+        { code: "GE", direction: "Göl + Edremit (Doğu)", unit_type: "2+1", compass: "D" },
     ]);
 
     const blockCode = block.code || block.name.charAt(0).toUpperCase();
@@ -128,7 +163,7 @@ export function UnitWizardModal({ block, trigger, onSuccess }: UnitWizardModalPr
 
     // ---- Face handlers ----
     const addFace = () => {
-        setFaces(prev => [...prev, { code: "", direction: "", unit_type: "3+1" }]);
+        setFaces(prev => [...prev, { code: "", direction: "", unit_type: "3+1", compass: "" }]);
     };
     const removeFace = (i: number) => {
         setFaces(prev => prev.filter((_, idx) => idx !== i));
@@ -182,10 +217,10 @@ export function UnitWizardModal({ block, trigger, onSuccess }: UnitWizardModalPr
         setNormalFloorCount(5);
         setHasRoof(false);
         setFaces([
-            { code: "CK", direction: "Çevre Yolu + Kale (Batı)", unit_type: "3+1" },
-            { code: "CE", direction: "Çevre Yolu + Edremit (Güney)", unit_type: "2+1" },
-            { code: "GK", direction: "Göl + Kale (Kuzey)", unit_type: "3+1" },
-            { code: "GE", direction: "Göl + Edremit (Doğu)", unit_type: "2+1" },
+            { code: "CK", direction: "Çevre Yolu + Kale (Batı)", unit_type: "3+1", compass: "B" },
+            { code: "CE", direction: "Çevre Yolu + Edremit (Güney)", unit_type: "2+1", compass: "G" },
+            { code: "GK", direction: "Göl + Kale (Kuzey)", unit_type: "3+1", compass: "K" },
+            { code: "GE", direction: "Göl + Edremit (Doğu)", unit_type: "2+1", compass: "D" },
         ]);
     };
 
@@ -297,12 +332,23 @@ export function UnitWizardModal({ block, trigger, onSuccess }: UnitWizardModalPr
                             {/* Summary */}
                             <div className="bg-primary/5 border border-primary/20 rounded-lg p-4 text-sm">
                                 <span className="font-semibold text-primary">Toplam {floors.length} kat</span>
-                                <span className="text-slate-500 ml-2">oluşturulacak:</span>
+                                <span className="text-slate-500 ml-2">tanımlandı:</span>
                                 <div className="mt-2 flex flex-wrap gap-1.5">
                                     {floors.map(f => (
-                                        <span key={f.floor_no} className="bg-white border border-slate-200 rounded px-2 py-0.5 text-[11px] font-mono text-slate-600">{f.label}</span>
+                                        <span
+                                            key={f.floor_no}
+                                            className={`rounded px-2 py-0.5 text-[11px] font-mono border ${f.isBasement
+                                                ? "bg-slate-100 border-slate-300 text-slate-400 line-through"
+                                                : "bg-white border-slate-200 text-slate-600"
+                                                }`}
+                                        >
+                                            {f.label}{f.isBasement ? " (otopark/depo)" : ""}
+                                        </span>
                                     ))}
                                 </div>
+                                {floors.some(f => f.isBasement) && (
+                                    <p className="text-xs text-amber-600 mt-2">⚠️ Bodrum katlarda otomatik daire oluşturulmaz.</p>
+                                )}
                             </div>
                         </div>
                     )}
@@ -369,7 +415,10 @@ export function UnitWizardModal({ block, trigger, onSuccess }: UnitWizardModalPr
                             </Button>
 
                             <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm text-amber-800">
-                                <strong>Toplam:</strong> {floors.length} kat × {faces.length} cephe = <strong>{generatedUnits.length} ünite</strong> oluşturulacak
+                                <strong>Toplam:</strong> {floors.filter(f => !f.isBasement).length} kat × {faces.length} cephe = <strong>{generatedUnits.length} ünite</strong> oluşturulacak
+                                {floors.some(f => f.isBasement) && (
+                                    <span className="ml-2 text-slate-500 text-xs">({floors.filter(f => f.isBasement).length} bodrum kat hariç)</span>
+                                )}
                             </div>
                         </div>
                     )}
