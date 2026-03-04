@@ -5,7 +5,6 @@ import * as THREE from "three";
 import { X, Shield, Info, Loader2, UserPlus } from "lucide-react";
 import { useAuthStore } from "@/store/useAuthStore";
 import { useProjectStore } from "@/store/useProjectStore";
-import { unitService } from "@/services/unit.service";
 import api from "@/lib/api";
 import { Unit, Customer } from "@/types/project.types";
 
@@ -13,29 +12,19 @@ import { Unit, Customer } from "@/types/project.types";
 // Constants and Types
 // ============================================================
 // ============================================================
-const FLOOR_LABELS = ['Z', '1', '2', '3', '4', '5'];
-const FLOORS = 6;
-
-const UNIT_DEFS = [
-    { col: 0, row: 0, lbl: 'CK', cephe: 'Çevre Yolu + Kale (Batı)' },
-    { col: 1, row: 0, lbl: 'CE', cephe: 'Çevre Yolu + Edremit (Güney)' },
-    { col: 0, row: 1, lbl: 'GK', cephe: 'Göl + Kale (Kuzey)' },
-    { col: 1, row: 1, lbl: 'GE', cephe: 'Göl + Edremit (Doğu)' },
-];
-
 type Status = 'available' | 'sold' | 'reserved' | 'not_for_sale';
 
 interface UnitData {
-    system_id: number | null; // Backend DB ID
-    id: string; // 3D local visual id (e.g B1CK)
+    system_id: number | null;
+    id: string;
     block: string;
+    block_id?: number;
     fi: number;
     fl: string;
     col: number;
     row: number;
     cephe: string;
     status: Status;
-    // The string customer_id or owner value stored visually
     owner?: string;
     customer_id?: number | null;
     phone?: string;
@@ -46,12 +35,35 @@ const SC_HEX: Record<Status, number> = { available: 0x27AE60, sold: 0xC8102E, re
 const SC_CSS: Record<Status, string> = { available: '#27AE60', sold: '#C8102E', reserved: '#E67E22', not_for_sale: '#95A5A6' };
 const SL: Record<Status, string> = { available: 'Satışa Açık', sold: 'Satıldı', reserved: 'Rezerve', not_for_sale: 'Satışa Kapalı' };
 
+// Block-to-units map used by Three.js scene builder
+interface BlockSceneConfig {
+    block: import('@/types/project.types').Block;
+    floors: string[];            // sorted floor labels, e.g. ["Zemin Kat","1. Kat",...]
+    floorTags: string[];         // matching floor_no codes, e.g. ["Z","1",...]
+    faces: string[];             // unique face codes, e.g. ["CK","CE","GK","GE"]
+    faceLabels: Record<string, string>; // face_code → cephe label
+}
+
+// Parse unit_no → { blockCode, floorTag, faceCode }
+function parseUnitNo(unit_no: string, blockCode: string): { floorTag: string; faceCode: string } | null {
+    if (!unit_no.startsWith(blockCode)) return null;
+    const rest = unit_no.slice(blockCode.length); // e.g. "1CK" or "ZCK" or "roofCK"
+    // floorTag is numeric chars or "Z" or "roof" at start, faceCode is the remainder
+    const m = rest.match(/^(-?\d+|Z|roof)(.+)$/);
+    if (!m) return null;
+    return { floorTag: m[1], faceCode: m[2] };
+}
+
 // ============================================================
 // Main Component
 // ============================================================
 export default function ThreeDViewer() {
     const mountRef = useRef<HTMLDivElement>(null);
     const [data, setData] = useState<Record<string, UnitData>>({});
+    const [blockConfigs, setBlockConfigs] = useState<BlockSceneConfig[]>([]);
+    const [layoutMode, setLayoutMode] = useState(false);
+    const [layoutBlocks, setLayoutBlocks] = useState<import('@/types/project.types').Block[]>([]);
+    const [savingLayout, setSavingLayout] = useState(false);
 
     // Global Auth and Context
     const { isAuthenticated } = useAuthStore();
@@ -86,71 +98,99 @@ export default function ThreeDViewer() {
         setView: (name: string) => void;
     } | null>(null);
 
-    // Initialize Dummy Data Layout then Fetch Backend
+    // Load blocks + units dynamically
     useEffect(() => {
-        let initialData: Record<string, UnitData> = {};
-        ['A', 'B'].forEach((b) => {
-            FLOOR_LABELS.forEach((fl, fi) => {
-                UNIT_DEFS.forEach((ud) => {
-                    const id = b + fl + ud.lbl;
-                    initialData[id] = {
-                        system_id: null,
-                        id,
-                        block: b,
-                        fi,
-                        fl,
-                        col: ud.col,
-                        row: ud.row,
-                        cephe: ud.cephe,
-                        status: 'available',
-                        owner: '',
-                        phone: '',
-                        note: ''
-                    };
+        if (!activeProject) { setIsFetching(false); return; }
+        setIsFetching(true);
+
+        const load = async () => {
+            try {
+                // 1. Fetch blocks
+                const blocksRes = await api.get('/blocks', { params: { project_id: activeProject.id } });
+                const blocks: import('@/types/project.types').Block[] = blocksRes.data?.data || blocksRes.data || [];
+                setLayoutBlocks(blocks);
+
+                // 2. Fetch all units
+                const unitsRes = await api.get('/units', { params: { active_project_id: activeProject.id } });
+                const serverUnits: Unit[] = unitsRes.data?.data || unitsRes.data || [];
+
+                // 3. Build block configs & data map
+                const newData: Record<string, UnitData> = {};
+                const configs: BlockSceneConfig[] = [];
+
+                blocks.forEach(block => {
+                    const blockCode = block.code || block.name.charAt(0).toUpperCase();
+                    const blockUnits = serverUnits.filter(u => u.block_id === block.id);
+
+                    if (blockUnits.length === 0) return;
+
+                    // Collect unique floors (preserve order from floor_no)
+                    const floorMap = new Map<string, string>(); // floorTag → label
+                    const faceSet = new Set<string>();
+                    const faceLabels: Record<string, string> = {};
+
+                    blockUnits.forEach((u: Unit) => {
+                        const parsed = parseUnitNo(u.unit_no, blockCode);
+                        if (!parsed) return;
+                        if (!floorMap.has(parsed.floorTag)) {
+                            floorMap.set(parsed.floorTag, u.floor_no || parsed.floorTag);
+                        }
+                        faceSet.add(parsed.faceCode);
+                        if (!faceLabels[parsed.faceCode]) faceLabels[parsed.faceCode] = u.unit_no;
+                    });
+
+                    // Sort floors: bodrum (negative) first, then Z, then numbers, then roof
+                    const sortedFloorTags = Array.from(floorMap.keys()).sort((a, b) => {
+                        const numA = a === 'Z' ? 0 : a === 'roof' ? 9999 : parseInt(a);
+                        const numB = b === 'Z' ? 0 : b === 'roof' ? 9999 : parseInt(b);
+                        return numA - numB;
+                    });
+
+                    const floors = sortedFloorTags.map(t => floorMap.get(t)!);
+                    const faces = Array.from(faceSet);
+
+                    configs.push({ block, floors, floorTags: sortedFloorTags, faces, faceLabels });
+
+                    // Populate data map
+                    sortedFloorTags.forEach((flTag, fi) => {
+                        faces.forEach((faceCode, col) => {
+                            const id = (u: Unit) => u.unit_no === `${blockCode}${flTag}${faceCode}`;
+                            const su = blockUnits.find(id);
+                            const unitId = `${blockCode}${flTag}${faceCode}`;
+                            newData[unitId] = {
+                                system_id: su ? (su.id as number) : null,
+                                id: unitId,
+                                block: blockCode,
+                                block_id: block.id,
+                                fi,
+                                fl: flTag,
+                                col,
+                                row: 0,
+                                cephe: faceLabels[faceCode] || faceCode,
+                                status: su ? (su.status as Status) : 'available',
+                                owner: '',
+                                phone: '',
+                                note: '',
+                            };
+                        });
+                    });
                 });
-            });
-        });
 
-        setData(initialData);
+                setBlockConfigs(configs);
+                setData(newData);
+            } catch (err) {
+                console.error('3D load error', err);
+            } finally {
+                setIsFetching(false);
+            }
+        };
 
-        // Fetch Real Units
-        if (activeProject) {
-            setIsFetching(true);
-            // unitService.getAll should exist or we can use generic api call if block parameter is flexible
-            // Usually the backend endpoint in UnitController parses ?active_project_id implicitly 
-            // via the middleware if we pass it, or we fetch per project.
-            fetchUnits(initialData);
-        } else {
-            setIsFetching(false);
-        }
+        load();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [activeProject]);
 
-    const fetchUnits = async (baseData: Record<string, UnitData>) => {
-        try {
-            const res = await api.get('/units', {
-                params: { active_project_id: activeProject?.id }
-            });
-            const result = res.data;
-            const serverUnits: Unit[] = result.data || result;
-
-            const merged = { ...baseData };
-
-            if (Array.isArray(serverUnits)) {
-                serverUnits.forEach((su) => {
-                    if (merged[su.unit_no]) {
-                        merged[su.unit_no].system_id = su.id as number;
-                        merged[su.unit_no].status = su.status as Status;
-                        // Map additional info if backend provides customer relation
-                    }
-                });
-            }
-            setData(merged);
-        } catch (error) {
-            console.error("Units error", error);
-        } finally {
-            setIsFetching(false);
-        }
+    const fetchUnits = async (_baseData: Record<string, UnitData>) => {
+        // Legacy: no-op now, kept for compatibility
     };
 
     // Fetch Customers
@@ -296,31 +336,6 @@ export default function ThreeDViewer() {
             return group;
         }
 
-        function buildBuildings() {
-            const step = UW + UGAP;
-            const zdep = UD + UGAP;
-
-            ['B', 'A'].forEach((bl, bi) => {
-                const bCenterX = (bi === 0)
-                    ? -(BLOCK_GAP / 2 + step / 2)
-                    : +(BLOCK_GAP / 2 + step / 2);
-
-                FLOOR_LABELS.forEach((fl, fi) => {
-                    const y = fi * (UH + UGAP) + UH / 2;
-                    UNIT_DEFS.forEach((ud) => {
-                        const id = bl + fl + ud.lbl;
-                        const ux = bCenterX + (ud.col === 0 ? -step / 2 : +step / 2);
-                        const uz = ud.row === 0 ? -zdep / 2 : +zdep / 2;
-
-                        const g = createUnitGroup(id);
-                        g.position.set(ux, y, uz);
-                        scene.add(g);
-                        unitGroups[id] = g;
-                    });
-                });
-            });
-        }
-
         function makeTextSprite(text: string, color: string, scale: number) {
             const c = document.createElement('canvas');
             c.width = 512; c.height = 96;
@@ -336,60 +351,63 @@ export default function ThreeDViewer() {
             return sp;
         }
 
-        function makeGroundLabel(text: string, color: string, scale: number) {
-            const c = document.createElement('canvas');
-            c.width = 1024; c.height = 256;
-            const ctx = c.getContext('2d')!;
-            ctx.font = 'bold 80px Montserrat,sans-serif';
-            ctx.fillStyle = color || '#444';
-            ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-            ctx.fillText(text, 512, 128);
-            const tex = new THREE.CanvasTexture(c);
-            tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
-            const mat = new THREE.MeshLambertMaterial({ map: tex, transparent: true, depthWrite: false, depthTest: true });
-            const geo = new THREE.PlaneGeometry(scale * 8, scale * 2);
-            const mesh = new THREE.Mesh(geo, mat);
-            mesh.rotation.x = -Math.PI / 2;
-            mesh.receiveShadow = true;
-            return mesh;
+        function buildBuildings() {
+
+            const step = UW + UGAP;
+
+            blockConfigs.forEach(cfg => {
+                const bl = cfg.block;
+                const blockCode = bl.code || bl.name.charAt(0).toUpperCase();
+                const numFaces = cfg.faces.length;
+                const totalW = numFaces * step;
+
+                // Use stored position or evenly space blocks
+                const bx = bl.scene_x ?? 0;
+                const bz = bl.scene_z ?? 0;
+                const angleRad = ((bl.scene_angle ?? 0) * Math.PI) / 180;
+
+                cfg.floorTags.forEach((flTag, fi) => {
+                    const y = fi * (UH + UGAP) + UH / 2;
+                    cfg.faces.forEach((faceCode, col) => {
+                        const id = `${blockCode}${flTag}${faceCode}`;
+                        // Column position centered on the block
+                        const localX = (col - (numFaces - 1) / 2) * step;
+                        // Rotate localX, 0 by scene_angle
+                        const ux = bx + localX * Math.cos(angleRad);
+                        const uz = bz + localX * Math.sin(angleRad);
+
+                        const g = createUnitGroup(id);
+                        g.position.set(ux, y, uz);
+                        g.rotation.y = -angleRad;
+                        scene.add(g);
+                        unitGroups[id] = g;
+                    });
+                });
+            });
         }
 
         function addLabels() {
-            const bAx = -(BLOCK_GAP / 2 + (UW + UGAP) / 2);
-            const bBx = (BLOCK_GAP / 2 + (UW + UGAP) / 2);
-            const northZ = -(UD + UGAP) / 2 - 3.5;
-            const southZ = +(UD + UGAP) / 2 + 3.5;
+            blockConfigs.forEach(cfg => {
+                const bl = cfg.block;
+                const blockCode = bl.code || bl.name.charAt(0).toUpperCase();
+                const bx = bl.scene_x ?? 0;
+                const bz = bl.scene_z ?? 0;
+                const numFloors = cfg.floorTags.length;
 
-            const lblA = makeTextSprite('BLOK B', '#C8102E', 0.7);
-            lblA.position.set(bAx, FLOORS * (UH + UGAP) + 0.9, 0);
-            scene.add(lblA);
+                // Block name label at top
+                const lblBlock = makeTextSprite(bl.name.toUpperCase(), '#C8102E', 0.7);
+                lblBlock.position.set(bx, numFloors * (UH + UGAP) + 0.9, bz);
+                scene.add(lblBlock);
 
-            const lblB = makeTextSprite('BLOK A', '#C8102E', 0.7);
-            lblB.position.set(bBx, FLOORS * (UH + UGAP) + 0.9, 0);
-            scene.add(lblB);
-
-            const n = makeGroundLabel('ÇEVRE YOLU', '#5D6D7E', 0.8);
-            n.position.set(0, 0.02, northZ);
-            scene.add(n);
-
-            const s = makeGroundLabel('GÖL', '#1A6B9A', 0.8);
-            s.position.set(0, 0.02, southZ);
-            scene.add(s);
-
-            const w = makeGroundLabel('EDREMİT', '#1E8449', 0.8);
-            w.position.set(bBx + (UW + UGAP) / 2 + 4.5, 0.02, 0);
-            w.rotation.z = -Math.PI / 2;
-            scene.add(w);
-
-            const e2 = makeGroundLabel('KALE', '#6C3483', 0.8);
-            e2.position.set(bAx - (UW + UGAP) / 2 - 4.5, 0.02, 0);
-            e2.rotation.z = Math.PI / 2;
-            scene.add(e2);
-
-            FLOOR_LABELS.forEach((fl, fi) => {
-                const sp = makeTextSprite(fi === 0 ? 'ZEMİN' : fl + '.KAT', '#C8102E', 0.4);
-                sp.position.set(bAx - (UW + UGAP) / 2 - 4.0, fi * (UH + UGAP) + UH / 2, 0);
-                scene.add(sp);
+                // Floor labels on the side
+                cfg.floorTags.forEach((flTag, fi) => {
+                    const label = flTag === 'Z' ? 'ZEMİN' : flTag === 'roof' ? 'ÇATI' : flTag + '.KAT';
+                    const sp = makeTextSprite(label, '#C8102E', 0.4);
+                    const numFaces = cfg.faces.length;
+                    const step = UW + UGAP;
+                    sp.position.set(bx - (numFaces * step) / 2 - 1.5, fi * (UH + UGAP) + UH / 2, bz);
+                    scene.add(sp);
+                });
             });
         }
 
@@ -654,17 +672,17 @@ export default function ThreeDViewer() {
 
             if (currentItem.system_id) {
                 // UPDATE
-                await unitService.update(currentItem.system_id, payload);
+                await api.put(`/units/${currentItem.system_id}`, payload);
             } else {
-                // CREATE - we need it to exist in the database first
-                // A better approach in a real CRM is pre-generating all units, but we handle create just in case
-                const res = await unitService.create(null as any, {
+                // CREATE
+                const res = await api.post('/units', {
                     ...payload,
-                    unit_type: 'Daire', // Default
-                } as any);
+                    unit_type: 'Daire',
+                    block_id: data[selectedId]?.block_id,
+                }, { params: { active_project_id: activeProject?.id } });
 
-                if (res.data) {
-                    currentItem.system_id = res.data.id as number;
+                if (res.data?.data) {
+                    currentItem.system_id = res.data.data.id as number;
                 }
             }
 
@@ -745,7 +763,104 @@ export default function ThreeDViewer() {
                     <div className="absolute top-3 left-3 flex flex-col gap-1 z-10">
                         <button className="w-[28px] md:w-[32px] h-[28px] md:h-[32px] bg-white/90 border border-[#DDE1E7] text-[#8892A0] text-lg rounded-[3px] flex items-center justify-center hover:bg-[#C8102E] hover:border-[#C8102E] hover:text-white transition-colors shadow-sm" onClick={() => threeRef.current?.doZoom(0.88)}>+</button>
                         <button className="w-[28px] md:w-[32px] h-[28px] md:h-[32px] bg-white/90 border border-[#DDE1E7] text-[#8892A0] text-lg rounded-[3px] flex items-center justify-center hover:bg-[#C8102E] hover:border-[#C8102E] hover:text-white transition-colors shadow-sm" onClick={() => threeRef.current?.doZoom(1.14)}>-</button>
+                        {isAdmin && (
+                            <button
+                                className={`w-[28px] md:w-[32px] h-[28px] md:h-[32px] text-[8px] font-bold border rounded-[3px] flex items-center justify-center transition-colors shadow-sm mt-1 ${layoutMode ? 'bg-amber-500 border-amber-500 text-white' : 'bg-white/90 border-[#DDE1E7] text-[#8892A0] hover:bg-amber-100 hover:border-amber-400'
+                                    }`}
+                                title="Blok Düzeni"
+                                onClick={() => setLayoutMode(v => !v)}
+                            >
+                                ☉
+                            </button>
+                        )}
                     </div>
+
+                    {/* Block Layout Editor Panel */}
+                    {layoutMode && isAdmin && (
+                        <div className="absolute top-3 left-14 z-20 bg-white/95 border border-amber-300 rounded-xl shadow-xl p-4 w-72 max-h-[80vh] overflow-y-auto">
+                            <div className="flex items-center justify-between mb-3">
+                                <span className="font-bold text-sm text-amber-700">Blok Konumu Ayarla</span>
+                                <button onClick={() => setLayoutMode(false)} className="text-slate-400 hover:text-slate-600"><X size={14} /></button>
+                            </div>
+                            <p className="text-[10px] text-slate-500 mb-3">Blokların 3D sahnedeki X/Z koordinatlarını ve açısını düzenleyin.</p>
+                            <div className="space-y-4">
+                                {layoutBlocks.map(blk => (
+                                    <div key={blk.id} className="border rounded-lg p-3 space-y-2">
+                                        <div className="font-semibold text-xs text-slate-700 flex items-center gap-1">
+                                            <span className="w-5 h-5 bg-primary text-white rounded flex items-center justify-center text-[9px] font-bold">{blk.code || blk.name.charAt(0)}</span>
+                                            {blk.name}
+                                        </div>
+                                        <div className="grid grid-cols-3 gap-2">
+                                            <div>
+                                                <label className="text-[9px] text-slate-400 uppercase tracking-wide">X Konum</label>
+                                                <input
+                                                    type="number" step="0.5"
+                                                    value={blk.scene_x ?? 0}
+                                                    onChange={e => setLayoutBlocks(prev => prev.map(b => b.id === blk.id ? { ...b, scene_x: parseFloat(e.target.value) } : b))}
+                                                    className="w-full border rounded px-2 py-1 text-xs font-mono"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="text-[9px] text-slate-400 uppercase tracking-wide">Z Konum</label>
+                                                <input
+                                                    type="number" step="0.5"
+                                                    value={blk.scene_z ?? 0}
+                                                    onChange={e => setLayoutBlocks(prev => prev.map(b => b.id === blk.id ? { ...b, scene_z: parseFloat(e.target.value) } : b))}
+                                                    className="w-full border rounded px-2 py-1 text-xs font-mono"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="text-[9px] text-slate-400 uppercase tracking-wide">Açı (°)</label>
+                                                <input
+                                                    type="number" step="5" min="0" max="360"
+                                                    value={blk.scene_angle ?? 0}
+                                                    onChange={e => setLayoutBlocks(prev => prev.map(b => b.id === blk.id ? { ...b, scene_angle: parseFloat(e.target.value) } : b))}
+                                                    className="w-full border rounded px-2 py-1 text-xs font-mono"
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                            <button
+                                disabled={savingLayout}
+                                onClick={async () => {
+                                    setSavingLayout(true);
+                                    try {
+                                        await Promise.all(layoutBlocks.map(blk =>
+                                            api.put(`/blocks/${blk.id}`, {
+                                                name: blk.name,
+                                                code: blk.code,
+                                                scene_x: blk.scene_x ?? 0,
+                                                scene_z: blk.scene_z ?? 0,
+                                                scene_angle: blk.scene_angle ?? 0,
+                                                active_project_id: activeProject?.id,
+                                            })
+                                        ));
+                                        // Reload to apply new positions
+                                        setBlockConfigs([]);
+                                        setData({});
+                                        setLayoutMode(false);
+                                        // Trigger re-fetch
+                                        setIsFetching(true);
+                                        const blocksRes = await api.get('/blocks', { params: { project_id: activeProject?.id } });
+                                        const blocks = blocksRes.data?.data || blocksRes.data || [];
+                                        setLayoutBlocks(blocks);
+                                        showToast('Blok konumları kaydedildi! Sayfa yenileniyor...');
+                                        setTimeout(() => window.location.reload(), 800);
+                                    } catch {
+                                        showToast('Kaydetme hatası!');
+                                    } finally {
+                                        setSavingLayout(false);
+                                    }
+                                }}
+                                className="mt-4 w-full bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold py-2 px-3 rounded-lg flex items-center justify-center gap-2 disabled:opacity-60"
+                            >
+                                {savingLayout ? <Loader2 size={12} className="animate-spin" /> : null}
+                                Konumları Kaydet
+                            </button>
+                        </div>
+                    )}
 
                     {/* View Buttons */}
                     <div className="absolute top-3 right-3 flex flex-col md:flex-row flex-wrap gap-1.5 justify-end z-10 max-w-[150px] md:max-w-[400px]">

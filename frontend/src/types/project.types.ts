@@ -19,6 +19,9 @@ export interface Block {
     name: string;
     code?: string;
     parcel_island?: string;
+    scene_x?: number;
+    scene_z?: number;
+    scene_angle?: number;
     created_at?: string;
     updated_at?: string;
     units_count?: number;

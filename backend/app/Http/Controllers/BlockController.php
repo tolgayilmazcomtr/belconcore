@@ -34,6 +34,9 @@ class BlockController extends Controller
             'name' => 'required|string|max:255',
             'code' => 'nullable|string|max:50',
             'parcel_island' => 'nullable|string|max:100',
+            'scene_x' => 'nullable|numeric',
+            'scene_z' => 'nullable|numeric',
+            'scene_angle' => 'nullable|numeric',
         ]);
 
         $validated['project_id'] = $request->active_project_id;
@@ -65,6 +68,9 @@ class BlockController extends Controller
             'name' => 'required|string|max:255',
             'code' => 'nullable|string|max:50',
             'parcel_island' => 'nullable|string|max:100',
+            'scene_x' => 'nullable|numeric',
+            'scene_z' => 'nullable|numeric',
+            'scene_angle' => 'nullable|numeric',
         ]);
 
         if (!empty($validated['code'])) {
