@@ -106,7 +106,7 @@ export default function ThreeDViewer() {
         const load = async () => {
             try {
                 // 1. Fetch blocks
-                const blocksRes = await api.get('/blocks', { params: { project_id: activeProject.id } });
+                const blocksRes = await api.get('/blocks', { params: { active_project_id: activeProject.id } });
                 const blocks: import('@/types/project.types').Block[] = blocksRes.data?.data || blocksRes.data || [];
                 setLayoutBlocks(blocks);
 
@@ -226,7 +226,7 @@ export default function ThreeDViewer() {
         renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
         renderer.setSize(W, H);
         renderer.shadowMap.enabled = true;
-        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        renderer.shadowMap.type = THREE.PCFShadowMap;
         renderer.setClearColor(0xECEEF2);
         mountRef.current.appendChild(renderer.domElement);
 
@@ -622,7 +622,7 @@ export default function ThreeDViewer() {
             if (mountRef.current) mountRef.current.removeChild(renderer.domElement);
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [data]); // Reloads THREE when data object structurally changes (first load)
+    }, [data, blockConfigs]); // Reloads THREE when data or blockConfigs changes
 
     // ============================================================
     // Handlers for Select and Hover syncing
@@ -878,7 +878,7 @@ export default function ThreeDViewer() {
                                         setLayoutMode(false);
                                         // Trigger re-fetch
                                         setIsFetching(true);
-                                        const blocksRes = await api.get('/blocks', { params: { project_id: activeProject?.id } });
+                                        const blocksRes = await api.get('/blocks', { params: { active_project_id: activeProject?.id } });
                                         const blocks = blocksRes.data?.data || blocksRes.data || [];
                                         setLayoutBlocks(blocks);
                                         showToast('Blok konumları kaydedildi! Sayfa yenileniyor...');
