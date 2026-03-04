@@ -9,7 +9,7 @@ import {
   Building, Home, ChevronDown, TrendingUp, TrendingDown,
   Landmark, FileCheck, BarChart2, Calendar, Wallet,
   FileBarChart, Receipt, ShoppingCart, ShoppingBag,
-  Menu, X, ChevronRight, Search
+  Menu, X, ChevronRight, Search, Box
 } from "lucide-react";
 import { CommandPalette, COMMANDS } from "./CommandPalette";
 
@@ -46,6 +46,7 @@ const NAV: NavEntry[] = [
       { label: "Tüm Projeler", href: "/projects", icon: <Building2 size={13} /> },
       { label: "Bloklar / Binalar", href: "/blocks", icon: <Building size={13} /> },
       { label: "Üniteler / Daireler", href: "/units", icon: <Home size={13} /> },
+      { label: "3D Satış Ekranı", href: "/3d-sale", icon: <Box size={13} /> },
     ],
   },
   {
