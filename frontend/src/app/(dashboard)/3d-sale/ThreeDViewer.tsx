@@ -62,8 +62,11 @@ export default function ThreeDViewer() {
     const [data, setData] = useState<Record<string, UnitData>>({});
     const [blockConfigs, setBlockConfigs] = useState<BlockSceneConfig[]>([]);
     const [layoutMode, setLayoutMode] = useState(false);
+    const [labelMode, setLabelMode] = useState(false);
     const [layoutBlocks, setLayoutBlocks] = useState<import('@/types/project.types').Block[]>([]);
     const [savingLayout, setSavingLayout] = useState(false);
+    const [camTheta, setCamTheta] = useState(-Math.PI * 0.75); // For compass
+    const [sceneLabels, setSceneLabels] = useState<Array<{ id?: number; text: string; x: number; z: number; rotation: number; color: string; scale: number }>>([]);
 
     // Global Auth and Context
     const { isAuthenticated } = useAuthStore();
@@ -109,6 +112,12 @@ export default function ThreeDViewer() {
                 const blocksRes = await api.get('/blocks', { params: { active_project_id: activeProject.id } });
                 const blocks: import('@/types/project.types').Block[] = blocksRes.data?.data || blocksRes.data || [];
                 setLayoutBlocks(blocks);
+
+                // 1b. Fetch scene labels
+                try {
+                    const labelsRes = await api.get('/scene-labels', { params: { active_project_id: activeProject.id } });
+                    setSceneLabels(labelsRes.data || []);
+                } catch { /* labels optional */ }
 
                 // 2. Fetch all units
                 const unitsRes = await api.get('/units', { params: { active_project_id: activeProject.id } });
@@ -409,6 +418,25 @@ export default function ThreeDViewer() {
         }
 
         function addLabels() {
+            // Helper: flat text on ground
+            function makeGroundLabel(text: string, color: string, scale: number) {
+                const c = document.createElement('canvas');
+                c.width = 1024; c.height = 256;
+                const ctx = c.getContext('2d')!;
+                ctx.font = 'bold 80px Montserrat,sans-serif';
+                ctx.fillStyle = color || '#444';
+                ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                ctx.fillText(text, 512, 128);
+                const tex = new THREE.CanvasTexture(c);
+                tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+                const mat = new THREE.MeshLambertMaterial({ map: tex, transparent: true, depthWrite: false });
+                const geo = new THREE.PlaneGeometry(scale * 8, scale * 2);
+                const mesh = new THREE.Mesh(geo, mat);
+                mesh.rotation.x = -Math.PI / 2;
+                return mesh;
+            }
+
+            // Block name + floor labels
             blockConfigs.forEach(cfg => {
                 const bl = cfg.block;
                 const bx = bl.scene_x ?? 0;
@@ -419,18 +447,24 @@ export default function ThreeDViewer() {
                 const numCols = Math.min(perRow, numFaces);
                 const stX = UW + UGAP;
 
-                // Block name label at top
                 const lblBlock = makeTextSprite(bl.name.toUpperCase(), '#C8102E', 0.7);
                 lblBlock.position.set(bx, numFloors * (UH + UGAP) + 0.9, bz);
                 scene.add(lblBlock);
 
-                // Floor labels on the side
                 cfg.floorTags.forEach((flTag, fi) => {
                     const label = flTag === 'Z' ? 'ZEMİN' : flTag === 'roof' ? 'ÇATI' : flTag + '.KAT';
                     const sp = makeTextSprite(label, '#C8102E', 0.4);
                     sp.position.set(bx - (numCols * stX) / 2 - 1.5, fi * (UH + UGAP) + UH / 2, bz);
                     scene.add(sp);
                 });
+            });
+
+            // Dynamic scene labels from backend
+            sceneLabels.forEach(lbl => {
+                const gl = makeGroundLabel(lbl.text, lbl.color || '#1A6B9A', lbl.scale || 1.0);
+                gl.position.set(lbl.x, 0.02, lbl.z);
+                gl.rotation.z = -(lbl.rotation * Math.PI) / 180;
+                scene.add(gl);
             });
         }
 
@@ -540,6 +574,7 @@ export default function ThreeDViewer() {
             if (!isRightDrag) {
                 camTheta -= dx * 0.007; camPhi += dy * 0.007;
                 camPhi = Math.max(0.08, Math.min(Math.PI * 0.47, camPhi));
+                setCamTheta(camTheta); // Push to React for compass overlay
             } else {
                 const right = new THREE.Vector3();
                 right.crossVectors(camera.getWorldDirection(new THREE.Vector3()), camera.up).normalize();
@@ -903,6 +938,110 @@ export default function ThreeDViewer() {
                             >
                                 {savingLayout ? <Loader2 size={12} className="animate-spin" /> : null}
                                 Konumları Kaydet
+                            </button>
+                        </div>
+                    )}
+
+                    {/* ─── Compass ─── */}
+                    {(() => {
+                        // Convert camTheta to compass bearing (degrees from North)
+                        // camTheta=0 → East, -PI/2 → North, PI/2 → South, ±PI → West
+                        const bearing = ((-camTheta - Math.PI / 2) * 180 / Math.PI + 360) % 360;
+                        const dirs = ['K', 'KD', 'D', 'GD', 'G', 'GB', 'B', 'KB'];
+                        const idx = Math.round(bearing / 45) % 8;
+                        return (
+                            <div className="absolute bottom-14 right-3 z-10 select-none">
+                                <div className="relative w-16 h-16">
+                                    <svg viewBox="0 0 100 100" className="w-full h-full drop-shadow-lg" style={{ transform: `rotate(${bearing}deg)`, transition: 'transform 0.1s ease' }}>
+                                        {/* Rose */}
+                                        <circle cx="50" cy="50" r="46" fill="white" fillOpacity="0.88" stroke="#DDE1E7" strokeWidth="2" />
+                                        {/* N pointer */}
+                                        <polygon points="50,8 44,50 56,50" fill="#C8102E" />
+                                        {/* S pointer */}
+                                        <polygon points="50,92 44,50 56,50" fill="#666" />
+                                        {/* Center dot */}
+                                        <circle cx="50" cy="50" r="5" fill="#333" />
+                                        {/* N label */}
+                                        <text x="50" y="6" textAnchor="middle" fontSize="10" fontWeight="bold" fill="#C8102E" style={{ transform: 'rotate(0deg)' }}>K</text>
+                                    </svg>
+                                </div>
+                                <div className="text-center text-[8px] font-bold text-slate-500 mt-0.5">{dirs[idx]}</div>
+                            </div>
+                        );
+                    })()}
+
+                    {/* ─── Label Mode Button ─── */}
+                    {isAdmin && (
+                        <button
+                            className={`absolute bottom-24 right-3 z-10 w-8 h-8 text-[8px] font-bold border rounded flex items-center justify-center shadow transition-colors ${labelMode ? 'bg-teal-500 border-teal-500 text-white' : 'bg-white/90 border-[#DDE1E7] text-slate-500 hover:bg-teal-50'}`}
+                            title="Zemin Etiketleri"
+                            onClick={() => setLabelMode(v => !v)}
+                        >
+                            𝐓
+                        </button>
+                    )}
+
+                    {/* ─── Label Editor Panel ─── */}
+                    {labelMode && isAdmin && (
+                        <div className="absolute bottom-3 right-14 z-20 bg-white/95 border border-teal-300 rounded-xl shadow-xl p-4 w-80 max-h-[75vh] overflow-y-auto">
+                            <div className="flex items-center justify-between mb-3">
+                                <span className="font-bold text-sm text-teal-700">Zemin Etiketleri</span>
+                                <button onClick={() => setLabelMode(false)} className="text-slate-400 hover:text-slate-600"><X size={14} /></button>
+                            </div>
+                            <p className="text-[10px] text-slate-500 mb-3">3D zeminde istediğin yere etiket ekle: Göl, Çevre Yolu, Kale vs.</p>
+                            <div className="space-y-3 max-h-60 overflow-y-auto pr-1">
+                                {sceneLabels.map((lbl, i) => (
+                                    <div key={lbl.id ?? i} className="border rounded p-2 space-y-1.5">
+                                        <div className="flex gap-1">
+                                            <input
+                                                className="flex-1 border rounded px-2 py-1 text-xs font-medium"
+                                                placeholder="Etiket metni"
+                                                value={lbl.text}
+                                                onChange={e => setSceneLabels(prev => prev.map((l, j) => j === i ? { ...l, text: e.target.value } : l))}
+                                            />
+                                            <input type="color" value={lbl.color} onChange={e => setSceneLabels(prev => prev.map((l, j) => j === i ? { ...l, color: e.target.value } : l))} className="w-8 h-7 border rounded cursor-pointer" />
+                                        </div>
+                                        <div className="grid grid-cols-4 gap-1">
+                                            {[{ k: 'x', lb: 'X' }, { k: 'z', lb: 'Z' }, { k: 'rotation', lb: 'Açı' }, { k: 'scale', lb: 'Boyut' }].map(f => (
+                                                <div key={f.k}>
+                                                    <label className="text-[8px] text-slate-400 uppercase">{f.lb}</label>
+                                                    <input
+                                                        type="number" step={f.k === 'scale' ? 0.1 : f.k === 'rotation' ? 5 : 0.5}
+                                                        value={(lbl as any)[f.k]}
+                                                        onChange={e => setSceneLabels(prev => prev.map((l, j) => j === i ? { ...l, [f.k]: parseFloat(e.target.value) } : l))}
+                                                        className="w-full border rounded px-1 py-1 text-xs font-mono"
+                                                    />
+                                                </div>
+                                            ))}
+                                        </div>
+                                        <div className="flex gap-1">
+                                            <button className="flex-1 bg-teal-500 hover:bg-teal-600 text-white text-[10px] font-bold py-1 rounded"
+                                                onClick={async () => {
+                                                    if (lbl.id) {
+                                                        await api.put(`/scene-labels/${lbl.id}`, { ...lbl, active_project_id: activeProject?.id });
+                                                    } else {
+                                                        const r = await api.post('/scene-labels', { ...lbl, active_project_id: activeProject?.id });
+                                                        setSceneLabels(prev => prev.map((l, j) => j === i ? r.data : l));
+                                                    }
+                                                    // Refresh scene
+                                                    setBlockConfigs(c => [...c]);
+                                                    showToast('Etiket kaydedildi!');
+                                                }}>Kaydet</button>
+                                            <button className="bg-red-100 hover:bg-red-200 text-red-600 text-[10px] font-bold py-1 px-2 rounded"
+                                                onClick={async () => {
+                                                    if (lbl.id) await api.delete(`/scene-labels/${lbl.id}`);
+                                                    setSceneLabels(prev => prev.filter((_, j) => j !== i));
+                                                    setBlockConfigs(c => [...c]);
+                                                }}>Sil</button>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                            <button
+                                className="mt-3 w-full border-2 border-dashed border-teal-300 text-teal-600 text-xs font-bold py-2 rounded-lg hover:bg-teal-50"
+                                onClick={() => setSceneLabels(prev => [...prev, { text: 'Yeni Etiket', x: 0, z: 0, rotation: 0, color: '#1A6B9A', scale: 1.0 }])}
+                            >
+                                + Yeni Etiket
                             </button>
                         </div>
                     )}

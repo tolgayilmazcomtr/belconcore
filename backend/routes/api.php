@@ -8,6 +8,7 @@ use App\Http\Controllers\UnitController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\LeadController;
+use App\Http\Controllers\SceneLabelController;
 use App\Http\Controllers\ActivityController;
 use App\Http\Controllers\OfferController;
 use App\Http\Controllers\TemplateConfigController;
@@ -37,6 +38,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
         Route::middleware('project.access')->group(function () {
         Route::apiResource('blocks', BlockController::class);
+        Route::apiResource('scene-labels', SceneLabelController::class)->only(['index', 'store', 'update', 'destroy']);
         Route::post('units/bulk', [UnitController::class, 'storeBulk']);
         Route::apiResource('units', UnitController::class);
         
