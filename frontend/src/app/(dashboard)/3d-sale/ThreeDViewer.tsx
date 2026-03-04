@@ -2,7 +2,7 @@
 
 import React, { useEffect, useRef, useState, useMemo } from "react";
 import * as THREE from "three";
-import { X, Menu, Search, Filter, Shield, Info, Loader2, UserPlus } from "lucide-react";
+import { X, Shield, Info, Loader2, UserPlus } from "lucide-react";
 import { useAuthStore } from "@/store/useAuthStore";
 import { useProjectStore } from "@/store/useProjectStore";
 import { unitService } from "@/services/unit.service";
@@ -54,14 +54,11 @@ export default function ThreeDViewer() {
     const [data, setData] = useState<Record<string, UnitData>>({});
 
     // Global Auth and Context
-    const { user, isAuthenticated } = useAuthStore();
+    const { isAuthenticated } = useAuthStore();
     const { activeProject } = useProjectStore();
 
-    // Quick role check: if exact role array varies, check logic. Usually 'admin' in user?.roles or user?.roles[x].name
-    const userRoles = Array.isArray(user?.roles) ? user?.roles.map((r: any) => typeof r === 'string' ? r : r?.name) : [];
-    const isUserAdmin = userRoles.includes('admin');
-    const isUserManager = userRoles.includes('manager');
-    const isAdmin = isAuthenticated && (isUserAdmin || isUserManager);
+    // The user requested that anyone logged into the ERP can edit 3D sales
+    const isAdmin = isAuthenticated;
 
     const [listFilter, setListFilter] = useState<Status | 'all'>('all');
     const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -857,9 +854,6 @@ export default function ThreeDViewer() {
                             {data[hoverId].phone && <>Tel: <span className="text-[#444]">{data[hoverId].phone}</span><br /></>}
                             {data[hoverId].note && <>Not: <span className="text-[#444]">{data[hoverId].note}</span></>}
                         </div>
-                        {!isAdmin && (
-                            <div className="mt-2 text-[7px] text-slate-400 bg-slate-50 p-1 border rounded inline-block">Düzenlemek için Admin girişi yapın</div>
-                        )}
                     </>
                 )}
             </div>
