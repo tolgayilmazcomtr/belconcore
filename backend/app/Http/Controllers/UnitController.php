@@ -140,25 +140,29 @@ class UnitController extends Controller
     public function update(Request $request, string $id)
     {
         $unit = \App\Models\Unit::findOrFail($id);
-        
+
         $validated = $request->validate([
-            'block_id' => 'nullable|exists:blocks,id',
-            'unit_no' => 'required|string|max:50',
-            'floor_no' => 'nullable|string|max:50',
-            'unit_type' => 'required|string|max:50',
-            'gross_area' => 'nullable|numeric|min:0',
-            'net_area' => 'nullable|numeric|min:0',
-            'status' => 'required|in:available,reserved,sold,not_for_sale',
-            'list_price' => 'nullable|numeric|min:0',
+            'block_id'   => 'sometimes|nullable|exists:blocks,id',
+            'unit_no'    => 'sometimes|required|string|max:50',
+            'floor_no'   => 'sometimes|nullable|string|max:50',
+            'unit_type'  => 'sometimes|required|string|max:50',
+            'gross_area' => 'sometimes|nullable|numeric|min:0',
+            'net_area'   => 'sometimes|nullable|numeric|min:0',
+            'status'     => 'sometimes|required|in:available,reserved,sold,not_for_sale',
+            'list_price' => 'sometimes|nullable|numeric|min:0',
         ]);
 
-        if ($validated['block_id'] !== $unit->block_id || $validated['unit_no'] !== $unit->unit_no) {
-             $existsQuery = \App\Models\Unit::where('project_id', $unit->project_id)
-                ->where('unit_no', $validated['unit_no'])
+        // unit_no veya block_id değiştiyse çakışma kontrolü
+        $newUnitNo  = $validated['unit_no']  ?? $unit->unit_no;
+        $newBlockId = array_key_exists('block_id', $validated) ? $validated['block_id'] : $unit->block_id;
+
+        if ($newUnitNo !== $unit->unit_no || $newBlockId !== $unit->block_id) {
+            $existsQuery = \App\Models\Unit::where('project_id', $unit->project_id)
+                ->where('unit_no', $newUnitNo)
                 ->where('id', '!=', $unit->id);
 
-            if (!empty($validated['block_id'])) {
-                $existsQuery->where('block_id', $validated['block_id']);
+            if (!empty($newBlockId)) {
+                $existsQuery->where('block_id', $newBlockId);
             } else {
                 $existsQuery->whereNull('block_id');
             }
