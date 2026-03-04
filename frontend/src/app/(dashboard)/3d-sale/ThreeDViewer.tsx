@@ -2,12 +2,17 @@
 
 import React, { useEffect, useRef, useState, useMemo } from "react";
 import * as THREE from "three";
-import { X, Menu, Search, Filter, Shield, Info } from "lucide-react";
+import { X, Menu, Search, Filter, Shield, Info, Loader2, UserPlus } from "lucide-react";
+import { useAuthStore } from "@/store/useAuthStore";
+import { useProjectStore } from "@/store/useProjectStore";
+import { unitService } from "@/services/unit.service";
+import api from "@/lib/api";
+import { Unit, Customer } from "@/types/project.types";
 
 // ============================================================
 // Constants and Types
 // ============================================================
-const PASS = 'zenith2026';
+// ============================================================
 const FLOOR_LABELS = ['Z', '1', '2', '3', '4', '5'];
 const FLOORS = 6;
 
@@ -18,10 +23,11 @@ const UNIT_DEFS = [
     { col: 1, row: 1, lbl: 'GE', cephe: 'Göl + Edremit (Doğu)' },
 ];
 
-type Status = 'available' | 'sold' | 'reserved' | 'closed';
+type Status = 'available' | 'sold' | 'reserved' | 'not_for_sale';
 
 interface UnitData {
-    id: string;
+    system_id: number | null; // Backend DB ID
+    id: string; // 3D local visual id (e.g B1CK)
     block: string;
     fi: number;
     fl: string;
@@ -29,14 +35,16 @@ interface UnitData {
     row: number;
     cephe: string;
     status: Status;
+    // The string customer_id or owner value stored visually
     owner?: string;
+    customer_id?: number | null;
     phone?: string;
     note?: string;
 }
 
-const SC_HEX = { available: 0x27AE60, sold: 0xC8102E, reserved: 0xE67E22, closed: 0x95A5A6 };
-const SC_CSS = { available: '#27AE60', sold: '#C8102E', reserved: '#E67E22', closed: '#95A5A6' };
-const SL = { available: 'Satışa Açık', sold: 'Satıldı', reserved: 'Rezerve', closed: 'Satışa Kapalı' };
+const SC_HEX: Record<Status, number> = { available: 0x27AE60, sold: 0xC8102E, reserved: 0xE67E22, not_for_sale: 0x95A5A6 };
+const SC_CSS: Record<Status, string> = { available: '#27AE60', sold: '#C8102E', reserved: '#E67E22', not_for_sale: '#95A5A6' };
+const SL: Record<Status, string> = { available: 'Satışa Açık', sold: 'Satıldı', reserved: 'Rezerve', not_for_sale: 'Satışa Kapalı' };
 
 // ============================================================
 // Main Component
@@ -44,18 +52,32 @@ const SL = { available: 'Satışa Açık', sold: 'Satıldı', reserved: 'Rezerve
 export default function ThreeDViewer() {
     const mountRef = useRef<HTMLDivElement>(null);
     const [data, setData] = useState<Record<string, UnitData>>({});
-    const [isAdmin, setIsAdmin] = useState(false);
+
+    // Global Auth and Context
+    const { user, isAuthenticated } = useAuthStore();
+    const { activeProject } = useProjectStore();
+
+    // Quick role check: if exact role array varies, check logic. Usually 'admin' in user?.roles or user?.roles[x].name
+    const userRoles = Array.isArray(user?.roles) ? user?.roles.map((r: any) => typeof r === 'string' ? r : r?.name) : [];
+    const isUserAdmin = userRoles.includes('admin');
+    const isUserManager = userRoles.includes('manager');
+    const isAdmin = isAuthenticated && (isUserAdmin || isUserManager);
+
     const [listFilter, setListFilter] = useState<Status | 'all'>('all');
     const [selectedId, setSelectedId] = useState<string | null>(null);
     const [hoverId, setHoverId] = useState<string | null>(null);
     const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
+    const [isFetching, setIsFetching] = useState(true);
+    const [customers, setCustomers] = useState<Customer[]>([]);
 
     // Modals and UI State
-    const [showLogin, setShowLogin] = useState(false);
-    const [loginPass, setLoginPass] = useState('');
-    const [loginErr, setLoginErr] = useState('');
     const [showEdit, setShowEdit] = useState(false);
-    const [editForm, setEditForm] = useState<Partial<UnitData>>({});
+    const [editForm, setEditForm] = useState<Partial<UnitData> & {
+        status?: Status;
+        net_area?: number;
+        gross_area?: number;
+        list_price?: number;
+    }>({});
     const [toastMsg, setToastMsg] = useState('');
     const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
@@ -67,32 +89,87 @@ export default function ThreeDViewer() {
         setView: (name: string) => void;
     } | null>(null);
 
-    // Initialize Data
+    // Initialize Dummy Data Layout then Fetch Backend
     useEffect(() => {
         let initialData: Record<string, UnitData> = {};
         ['A', 'B'].forEach((b) => {
             FLOOR_LABELS.forEach((fl, fi) => {
                 UNIT_DEFS.forEach((ud) => {
                     const id = b + fl + ud.lbl;
-                    initialData[id] = { id, block: b, fi, fl, col: ud.col, row: ud.row, cephe: ud.cephe, status: 'available', owner: '', phone: '', note: '' };
+                    initialData[id] = {
+                        system_id: null,
+                        id,
+                        block: b,
+                        fi,
+                        fl,
+                        col: ud.col,
+                        row: ud.row,
+                        cephe: ud.cephe,
+                        status: 'available',
+                        owner: '',
+                        phone: '',
+                        note: ''
+                    };
                 });
             });
         });
 
-        try {
-            const saved = localStorage.getItem('znthB');
-            if (saved) initialData = JSON.parse(saved);
-        } catch (e) { }
-
         setData(initialData);
-    }, []);
 
-    const saveToLocal = (newData: Record<string, UnitData>) => {
-        setData(newData);
+        // Fetch Real Units
+        if (activeProject) {
+            setIsFetching(true);
+            // unitService.getAll should exist or we can use generic api call if block parameter is flexible
+            // Usually the backend endpoint in UnitController parses ?active_project_id implicitly 
+            // via the middleware if we pass it, or we fetch per project.
+            fetchUnits(initialData);
+        } else {
+            setIsFetching(false);
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [activeProject]);
+
+    const fetchUnits = async (baseData: Record<string, UnitData>) => {
         try {
-            localStorage.setItem('znthB', JSON.stringify(newData));
-        } catch (e) { }
+            const res = await api.get('/units', {
+                params: { active_project_id: activeProject?.id }
+            });
+            const result = res.data;
+            const serverUnits: Unit[] = result.data || result;
+
+            const merged = { ...baseData };
+
+            if (Array.isArray(serverUnits)) {
+                serverUnits.forEach((su) => {
+                    if (merged[su.unit_no]) {
+                        merged[su.unit_no].system_id = su.id as number;
+                        merged[su.unit_no].status = su.status as Status;
+                        // Map additional info if backend provides customer relation
+                    }
+                });
+            }
+            setData(merged);
+        } catch (error) {
+            console.error("Units error", error);
+        } finally {
+            setIsFetching(false);
+        }
     };
+
+    // Fetch Customers
+    useEffect(() => {
+        if (!activeProject || !isAdmin) return;
+        const fetchCustomers = async () => {
+            try {
+                const response = await api.get('/customers');
+                // The CRM might return nested data from the Laravel resource
+                setCustomers(response.data.data || response.data);
+            } catch (err) {
+                console.error("Customers error", err);
+            }
+        };
+        fetchCustomers();
+    }, [activeProject, isAdmin]);
 
     const showToast = (msg: string) => {
         setToastMsg(msg);
@@ -560,32 +637,58 @@ export default function ThreeDViewer() {
     // ============================================================
     // Admin Login + Edit Logic
     // ============================================================
-    const handleLogin = () => {
-        if (loginPass === PASS) {
-            setIsAdmin(true);
-            setShowLogin(false);
-            setLoginPass('');
-            setLoginErr('');
-            showToast('Admin modu aktif — dairelere tıklayarak düzenleyin');
-        } else {
-            setLoginErr('Hatalı şifre.');
-        }
-    };
 
-    const saveUnit = () => {
-        if (!selectedId || !editForm.status) return;
-        const newData = { ...data };
-        newData[selectedId] = {
-            ...newData[selectedId],
-            status: editForm.status as Status,
-            owner: editForm.owner || '',
-            phone: editForm.phone || '',
-            note: editForm.note || ''
-        };
-        saveToLocal(newData);
-        threeRef.current?.refreshUnitLabel(selectedId);
-        setShowEdit(false);
-        showToast(selectedId + ' kaydedildi');
+    const saveUnit = async () => {
+        if (!selectedId || !editForm.status || !activeProject) return;
+
+        try {
+            const currentItem = data[selectedId];
+
+            // Build Unit Form mapping
+            const payload: any = {
+                unit_no: selectedId,
+                status: editForm.status,
+                net_area: editForm.net_area || null, // Optional tracking
+                gross_area: editForm.gross_area || null,
+                list_price: editForm.list_price || null,
+                // We will send customer ID to backend manually if backend supports it directly on Unit.
+                // Otherwise we just save visual notes for now until full CRM backend bind is verified.
+            };
+
+            if (currentItem.system_id) {
+                // UPDATE
+                await unitService.update(currentItem.system_id, payload);
+            } else {
+                // CREATE - we need it to exist in the database first
+                // A better approach in a real CRM is pre-generating all units, but we handle create just in case
+                const res = await unitService.create(null as any, {
+                    ...payload,
+                    unit_type: 'Daire', // Default
+                } as any);
+
+                if (res.data) {
+                    currentItem.system_id = res.data.id as number;
+                }
+            }
+
+            const newData = { ...data };
+            newData[selectedId] = {
+                ...newData[selectedId],
+                status: editForm.status as Status,
+                owner: editForm.owner || '',
+                customer_id: editForm.customer_id,
+                phone: editForm.phone || '',
+                note: editForm.note || ''
+            };
+
+            setData(newData);
+            threeRef.current?.refreshUnitLabel(selectedId);
+            setShowEdit(false);
+            showToast(selectedId + ' bilgileri güncellendi!');
+        } catch (err) {
+            console.error(err);
+            showToast('Hata: Bir sorun oluştu.');
+        }
     };
 
     // ============================================================
@@ -597,7 +700,7 @@ export default function ThreeDViewer() {
         available: allUnits.filter(u => u.status === 'available').length,
         sold: allUnits.filter(u => u.status === 'sold').length,
         reserved: allUnits.filter(u => u.status === 'reserved').length,
-        closed: allUnits.filter(u => u.status === 'closed').length,
+        closed: allUnits.filter(u => u.status === 'not_for_sale').length,
     };
 
     const filteredUnits = useMemo(() => {
@@ -611,42 +714,24 @@ export default function ThreeDViewer() {
     return (
         <div className="flex flex-col h-full bg-[#eceef2] font-sans text-[#1a1a2e]">
 
-            {/* HEADER */}
-            <header className="flex justify-between items-center px-4 md:px-7 py-2 md:py-3 bg-white border-b-[3px] border-[#C8102E] shadow-[0_2px_10px_rgba(0,0,0,0.07)] shrink-0 z-10 w-full flex-wrap gap-2">
-                <div className="flex items-center gap-3 md:gap-4 shrink-0">
-                    <img src="/logo.png" alt="Belcon" className="h-6 md:h-8 object-contain" />
-                    <div className="hidden md:block w-px h-[30px] bg-[#DDE1E7]"></div>
-                    <div className="flex flex-col">
-                        <div className="font-[Bebas_Neue] text-lg md:text-xl tracking-[3px] md:tracking-[5px] leading-none">ZENİTH EDREMİT</div>
-                        <div className="text-[8px] md:text-[9px] tracking-[2px] md:tracking-[3px] text-[#8892A0] uppercase mt-0.5 md:mt-1">Van · Edremit · Satış Takip</div>
-                    </div>
+            {/* Project Context Header Overlay */}
+            {!activeProject && (
+                <div className="absolute inset-0 z-50 bg-white/80 backdrop-blur-sm flex flex-col items-center justify-center pointer-events-auto">
+                    <Shield className="text-[#C8102E] mb-4" size={48} />
+                    <div className="font-[Bebas_Neue] text-2xl tracking-[3px] text-[#1a1a2e]">Aktif proje seçilmedi</div>
+                    <div className="text-[#8892A0] text-sm mt-2 max-w-sm text-center">3D Satış Ekranını kullanabilmek için lütfen sol menüden projenizi (örn: ZENITH EDREMİT) seçin.</div>
                 </div>
-                <div className="flex items-center gap-2 md:gap-3 ml-auto">
-                    {isAdmin && (
-                        <div className="flex items-center gap-1.5 md:gap-2 text-[8px] md:text-[9px] tracking-[2px] text-[#27AE60] bg-[#e8f8ef] px-2 md:px-3 py-1 md:py-1.5 rounded-full uppercase">
-                            <div className="w-1.5 h-1.5 rounded-full bg-[#27AE60] animate-pulse"></div>
-                            Admin Modu
-                        </div>
-                    )}
-                    <button
-                        onClick={() => isAdmin ? setIsAdmin(false) : setShowLogin(true)}
-                        className="bg-[#C8102E] hover:bg-[#E8294A] text-white px-3 md:px-5 py-1.5 md:py-2 text-[9px] md:text-[10px] tracking-[2px] uppercase font-semibold rounded-[3px] transition-colors"
-                    >
-                        {isAdmin ? 'Çıkış Yap' : 'Admin Girişi'}
-                    </button>
+            )}
 
-                    <button
-                        className="md:hidden p-1.5 bg-white border border-[#DDE1E7] rounded-md text-[#8892A0]"
-                        onClick={() => setIsMobileSidebarOpen(t => !t)}
-                    >
-                        <Menu size={18} />
-                    </button>
+            {isFetching && (
+                <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50 bg-white/90 shadow px-4 py-2 rounded-full border border-slate-200 flex items-center gap-2 text-sm text-slate-600">
+                    <Loader2 size={16} className="animate-spin text-[#C8102E]" /> Yükleniyor...
                 </div>
-            </header>
+            )}
 
             {/* LEGEND */}
             <div className="flex justify-start md:justify-center overflow-x-auto gap-4 md:gap-6 px-4 py-2 bg-white border-b border-[#DDE1E7] shrink-0 w-full hide-scrollbar flex-nowrap whitespace-nowrap">
-                {Object.entries({ available: '#27AE60', sold: '#C8102E', reserved: '#E67E22', closed: '#95A5A6' }).map(([k, color]) => (
+                {Object.entries(SC_CSS).map(([k, color]) => (
                     <div key={k} className="flex items-center gap-1.5 text-[8px] md:text-[9px] tracking-[1.5px] uppercase text-[#8892A0]">
                         <div className="w-2 md:w-2.5 h-2 md:h-2.5 rounded-[2px]" style={{ backgroundColor: color }}></div>
                         {SL[k as Status]}
@@ -691,7 +776,7 @@ export default function ThreeDViewer() {
                             { id: 'available', color: '#27AE60', label: 'Açık', val: stats.available },
                             { id: 'sold', color: '#C8102E', label: 'Satıldı', val: stats.sold },
                             { id: 'reserved', color: '#E67E22', label: 'Rezerve', val: stats.reserved },
-                            { id: 'closed', color: '#95A5A6', label: 'Kapalı', val: stats.closed },
+                            { id: 'not_for_sale', color: '#95A5A6', label: 'Kapalı', val: stats.closed },
                         ].map((st, i) => (
                             <div key={st.id} className={`flex-1 min-w-[60px] p-1.5 md:p-2.5 text-center ${i !== 4 ? 'border-r border-[#DDE1E7]' : ''}`}>
                                 <div className="font-[Bebas_Neue] text-xl md:text-2xl leading-none" style={{ color: st.color }}>{st.val}</div>
@@ -721,7 +806,7 @@ export default function ThreeDViewer() {
                         )}
                     </div>
                     <div className="p-2.5 md:p-3.5 border-b border-[#DDE1E7] flex gap-1.5 flex-wrap">
-                        {['all', 'available', 'sold', 'reserved', 'closed'].map(f => (
+                        {['all', 'available', 'sold', 'reserved', 'not_for_sale'].map(f => (
                             <button
                                 key={f}
                                 className={`px-2 py-1 text-[8px] tracking-[1px] uppercase border rounded-full transition-colors ${listFilter === f ? 'border-[#C8102E] text-[#C8102E] bg-[#fdeef1]' : 'border-[#DDE1E7] text-[#8892A0] bg-transparent hover:border-[#C8102E] hover:text-[#C8102E] hover:bg-[#fdeef1]'}`}
@@ -779,31 +864,6 @@ export default function ThreeDViewer() {
                 )}
             </div>
 
-            {/* MODALS OVERLAY */}
-            {showLogin && (
-                <div className="fixed inset-0 bg-black/30 backdrop-blur-[5px] z-[3000] flex items-center justify-center p-4">
-                    <div className="bg-white border text-center border-[#DDE1E7] border-t-[3px] border-t-[#C8102E] w-[330px] max-w-full px-6 md:px-8 py-7 md:py-9 rounded-md shadow-[0_20px_50px_rgba(0,0,0,0.15)] animate-in fade-in slide-in-from-bottom-2">
-                        <div className="font-[Bebas_Neue] text-2xl md:text-[28px] tracking-[6px] text-[#C8102E]">ZENİTH</div>
-                        <div className="text-[8px] tracking-[4px] text-[#8892A0] uppercase mt-1 mb-5">Admin Paneli</div>
-                        <div className="mb-4 text-left">
-                            <label className="block text-[8px] tracking-[3px] uppercase text-[#8892A0] mb-1.5">Şifre</label>
-                            <input
-                                type="password"
-                                className="w-full bg-[#f7f8fa] border border-[#DDE1E7] text-[#1a1a2e] px-3 py-2 text-[12px] rounded-[3px] outline-none focus:border-[#C8102E] focus:bg-white transition-colors"
-                                placeholder="••••••••"
-                                value={loginPass}
-                                onChange={e => setLoginPass(e.target.value)}
-                                onKeyDown={e => e.key === 'Enter' && handleLogin()}
-                                autoFocus
-                            />
-                        </div>
-                        <button className="w-full bg-[#C8102E] hover:bg-[#E8294A] text-white py-2.5 text-[10px] tracking-[2px] uppercase font-bold rounded-[3px] transition-colors" onClick={handleLogin}>Giriş Yap</button>
-                        <div className="text-[#C8102E] text-[9px] mt-2 h-[13px]">{loginErr}</div>
-                        <button className="w-full mt-2 text-[#8892A0] border border-[#DDE1E7] py-2.5 text-[10px] rounded-[3px] hover:text-[#1a1a2e] transition-colors" onClick={() => setShowLogin(false)}>İptal</button>
-                    </div>
-                </div>
-            )}
-
             {showEdit && selectedId && data[selectedId] && (
                 <div className="fixed inset-0 bg-black/30 backdrop-blur-[5px] z-[3000] flex items-center justify-center p-4">
                     <div className="bg-white border border-[#DDE1E7] border-t-[3px] border-t-[#C8102E] w-[410px] max-w-[95vw] rounded-md shadow-[0_20px_50px_rgba(0,0,0,0.15)] animate-in fade-in slide-in-from-bottom-2 flex flex-col max-h-[90vh]">
@@ -818,7 +878,7 @@ export default function ThreeDViewer() {
                             <div className="mb-3.5">
                                 <label className="block text-[8px] tracking-[3px] uppercase text-[#8892A0] mb-1.5">Durum</label>
                                 <div className="grid grid-cols-2 gap-2">
-                                    {['available', 'sold', 'reserved', 'closed'].map(s => (
+                                    {['available', 'sold', 'reserved', 'not_for_sale'].map(s => (
                                         <div
                                             key={s}
                                             className={`px-3 py-2.5 border cursor-pointer flex items-center gap-2 text-[10px] md:text-[11px] rounded-[3px] transition-colors ${editForm.status === s ? 'border-[#C8102E] bg-[#fdeef1]' : 'border-[#DDE1E7] bg-[#f7f8fa] hover:border-[#bbb] hover:bg-white'}`}
@@ -831,11 +891,37 @@ export default function ThreeDViewer() {
                                 </div>
                             </div>
                             <div className="mb-3.5">
-                                <label className="block text-[8px] tracking-[3px] uppercase text-[#8892A0] mb-1.5">Alıcı Adı</label>
+                                <label className="block text-[8px] tracking-[3px] uppercase text-[#8892A0] mb-1.5 flex items-center gap-1">
+                                    <UserPlus size={10} /> Müşteri Ata
+                                </label>
+                                <select
+                                    className="w-full bg-[#f7f8fa] border border-[#DDE1E7] text-[#1a1a2e] px-3 py-2 text-[12px] rounded-[3px] outline-none focus:border-[#C8102E] focus:bg-white transition-colors appearance-none"
+                                    value={editForm.customer_id || ''}
+                                    onChange={e => {
+                                        const cid = e.target.value ? Number(e.target.value) : undefined;
+                                        const c = customers.find(x => x.id === cid);
+                                        setEditForm(prev => ({
+                                            ...prev,
+                                            customer_id: cid,
+                                            owner: c ? (c.first_name ? `${c.first_name} ${c.last_name || ''}` : c.company_name) : prev.owner,
+                                            phone: c ? c.phone : prev.phone
+                                        }));
+                                    }}
+                                >
+                                    <option value="">-- Müşteri Seçin --</option>
+                                    {customers.map(c => (
+                                        <option key={c.id} value={c.id}>
+                                            {c.first_name ? `${c.first_name} ${c.last_name || ''}` : c.company_name}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div className="mb-3.5">
+                                <label className="block text-[8px] tracking-[3px] uppercase text-[#8892A0] mb-1.5">Manuel Alıcı Adı / Firma</label>
                                 <input
                                     type="text"
                                     className="w-full bg-[#f7f8fa] border border-[#DDE1E7] text-[#1a1a2e] px-3 py-2 text-[12px] rounded-[3px] outline-none focus:border-[#C8102E] focus:bg-white transition-colors"
-                                    placeholder="Ad Soyad..."
+                                    placeholder="Manuel isim giriniz..."
                                     value={editForm.owner || ''}
                                     onChange={e => setEditForm(prev => ({ ...prev, owner: e.target.value }))}
                                 />
