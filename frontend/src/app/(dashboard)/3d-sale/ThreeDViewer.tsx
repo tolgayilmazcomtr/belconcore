@@ -629,7 +629,15 @@ export default function ThreeDViewer() {
                 camR *= tPrev / d; camR = Math.max(5, Math.min(70, camR)); tPrev = d; updateCamera();
             }
         };
-        const onTouchEnd = () => { isDragging = false; tPrev = null; setTimeout(() => { wasDrag = false; }, 50); };
+        const onTouchEnd = (e: TouchEvent) => {
+            isDragging = false; tPrev = null;
+            if (!wasDrag && e.changedTouches.length > 0) {
+                const t = e.changedTouches[0];
+                const id = getHitUnit(t.clientX, t.clientY);
+                if (id) setSelectedId(id);
+            }
+            setTimeout(() => { wasDrag = false; }, 50);
+        };
 
         canvas.addEventListener('mousedown', onMouseDown);
         document.addEventListener('mousemove', onMouseMoveDoc);
