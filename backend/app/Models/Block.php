@@ -15,6 +15,10 @@ class Block extends Model
         'name',
         'code',
         'parcel_island',
+        'scene_x',
+        'scene_z',
+        'scene_angle',
+        'faces_per_row',
     ];
 
     public function project()
