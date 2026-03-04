@@ -352,29 +352,41 @@ export default function ThreeDViewer() {
         }
 
         function buildBuildings() {
-
-            const step = UW + UGAP;
+            const stepX = UW + UGAP;  // X ekseninde adım (sütunlar arası)
+            const stepZ = UD + UGAP;  // Z ekseninde adım (sıralar arası)
 
             blockConfigs.forEach(cfg => {
                 const bl = cfg.block;
                 const blockCode = bl.code || bl.name.charAt(0).toUpperCase();
                 const numFaces = cfg.faces.length;
-                const totalW = numFaces * step;
+                const perRow = Math.max(1, bl.faces_per_row ?? numFaces); // Satır başında kaç daire
+                const numCols = Math.min(perRow, numFaces);  // X sütun sayısı
+                const numRows = Math.ceil(numFaces / numCols); // Z satır sayısı
 
-                // Use stored position or evenly space blocks
                 const bx = bl.scene_x ?? 0;
                 const bz = bl.scene_z ?? 0;
                 const angleRad = ((bl.scene_angle ?? 0) * Math.PI) / 180;
+                const ca = Math.cos(angleRad);
+                const sa = Math.sin(angleRad);
+
+                // Bloğun toplam genişlik/derinliği merkezlensin
+                const totalX = (numCols - 1) * stepX;
+                const totalZ = (numRows - 1) * stepZ;
 
                 cfg.floorTags.forEach((flTag, fi) => {
                     const y = fi * (UH + UGAP) + UH / 2;
-                    cfg.faces.forEach((faceCode, col) => {
+                    cfg.faces.forEach((faceCode, fi2) => {
                         const id = `${blockCode}${flTag}${faceCode}`;
-                        // Column position centered on the block
-                        const localX = (col - (numFaces - 1) / 2) * step;
-                        // Rotate localX, 0 by scene_angle
-                        const ux = bx + localX * Math.cos(angleRad);
-                        const uz = bz + localX * Math.sin(angleRad);
+                        const col = fi2 % numCols;   // X indeksi
+                        const row = Math.floor(fi2 / numCols); // Z indeksi
+
+                        // Merkeze göre lokal koordinat
+                        const lx = (col * stepX) - totalX / 2;
+                        const lz = (row * stepZ) - totalZ / 2;
+
+                        // Blok rotasyonu uygula
+                        const ux = bx + lx * ca - lz * sa;
+                        const uz = bz + lx * sa + lz * ca;
 
                         const g = createUnitGroup(id);
                         g.position.set(ux, y, uz);
@@ -389,10 +401,13 @@ export default function ThreeDViewer() {
         function addLabels() {
             blockConfigs.forEach(cfg => {
                 const bl = cfg.block;
-                const blockCode = bl.code || bl.name.charAt(0).toUpperCase();
                 const bx = bl.scene_x ?? 0;
                 const bz = bl.scene_z ?? 0;
                 const numFloors = cfg.floorTags.length;
+                const numFaces = cfg.faces.length;
+                const perRow = Math.max(1, bl.faces_per_row ?? numFaces);
+                const numCols = Math.min(perRow, numFaces);
+                const stX = UW + UGAP;
 
                 // Block name label at top
                 const lblBlock = makeTextSprite(bl.name.toUpperCase(), '#C8102E', 0.7);
@@ -403,9 +418,7 @@ export default function ThreeDViewer() {
                 cfg.floorTags.forEach((flTag, fi) => {
                     const label = flTag === 'Z' ? 'ZEMİN' : flTag === 'roof' ? 'ÇATI' : flTag + '.KAT';
                     const sp = makeTextSprite(label, '#C8102E', 0.4);
-                    const numFaces = cfg.faces.length;
-                    const step = UW + UGAP;
-                    sp.position.set(bx - (numFaces * step) / 2 - 1.5, fi * (UH + UGAP) + UH / 2, bz);
+                    sp.position.set(bx - (numCols * stX) / 2 - 1.5, fi * (UH + UGAP) + UH / 2, bz);
                     scene.add(sp);
                 });
             });
@@ -819,6 +832,27 @@ export default function ThreeDViewer() {
                                                 />
                                             </div>
                                         </div>
+                                        {/* Satır başı daire ayarı */}
+                                        <div className="pt-1 border-t">
+                                            <label className="text-[9px] text-slate-400 uppercase tracking-wide">Satır başı daire (satır x sütun)</label>
+                                            <div className="flex items-center gap-2 mt-1">
+                                                <input
+                                                    type="number" min="1" max="20" step="1"
+                                                    value={blk.faces_per_row ?? 4}
+                                                    onChange={e => setLayoutBlocks(prev => prev.map(b => b.id === blk.id ? { ...b, faces_per_row: parseInt(e.target.value) } : b))}
+                                                    className="w-20 border rounded px-2 py-1 text-xs font-mono"
+                                                />
+                                                <span className="text-[10px] text-slate-400">
+                                                    {(() => {
+                                                        const n = 4; // örnek
+                                                        const pr = blk.faces_per_row ?? n;
+                                                        const cols = Math.min(pr, n);
+                                                        const rows = Math.ceil(n / cols);
+                                                        return `${cols} sütun × ${rows} satır`;
+                                                    })()}
+                                                </span>
+                                            </div>
+                                        </div>
                                     </div>
                                 ))}
                             </div>
@@ -834,6 +868,7 @@ export default function ThreeDViewer() {
                                                 scene_x: blk.scene_x ?? 0,
                                                 scene_z: blk.scene_z ?? 0,
                                                 scene_angle: blk.scene_angle ?? 0,
+                                                faces_per_row: blk.faces_per_row ?? 4,
                                                 active_project_id: activeProject?.id,
                                             })
                                         ));
