@@ -37,7 +37,7 @@ export default function OffersPage() {
             setIsLoading(true);
             try {
                 const response = await api.get('/offers');
-                setOffers(response.data.data);
+                setOffers(response.data.data || []);
             } catch (error) {
                 console.error('Teklifler alınamadı', error);
                 toast.error('Teklifler yüklenirken bir sorun oluştu.');
@@ -173,7 +173,7 @@ export default function OffersPage() {
                         {f.label}
                         {f.value !== 'all' && (
                             <span className={`ml-1.5 text-xs ${statusFilter === f.value ? 'opacity-80' : 'opacity-60'}`}>
-                                ({offers.filter(o => o.status === f.value).length})
+                                {offers?.filter(o => o.status === f.value).length})
                             </span>
                         )}
                     </button>

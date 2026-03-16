@@ -54,7 +54,7 @@ export function LeadCreateModal({ editLead, trigger }: LeadCreateModalProps) {
             // Fetch units for the project to link to lead
             api.get('/units', {
                 params: { active_project_id: activeProject.id }
-            }).then(res => setUnits(res.data.data)).catch(() => { });
+            }).then(res => setUnits(res.data.data || [])).catch(() => { });
         }
     }, [activeProject, isOpen]);
 
@@ -166,7 +166,7 @@ export function LeadCreateModal({ editLead, trigger }: LeadCreateModalProps) {
                                     </SelectTrigger>
                                     <SelectContent>
                                         <SelectItem value="none" className="text-slate-400 italic">Müşteri Seçilmedi</SelectItem>
-                                        {customers.map(c => (
+                                        {customers?.map(c => (
                                             <SelectItem key={c.id} value={c.id.toString()}>
                                                 {c.type === 'corporate' ? c.company_name : `${c.first_name} ${c.last_name}`}
                                             </SelectItem>
@@ -186,7 +186,7 @@ export function LeadCreateModal({ editLead, trigger }: LeadCreateModalProps) {
                                     </SelectTrigger>
                                     <SelectContent>
                                         <SelectItem value="none" className="text-slate-400 italic">Birim Seçilmedi</SelectItem>
-                                        {units.map(u => (
+                                        {units?.map(u => (
                                             <SelectItem key={u.id} value={u.id.toString()}>
                                                 {(u as any).block?.name} - No: {u.unit_no}
                                             </SelectItem>

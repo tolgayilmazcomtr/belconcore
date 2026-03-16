@@ -195,7 +195,7 @@ function CustomerCombobox({ customers, value, onChange, onAddNew }: CustomerComb
                         {filtered.length === 0 ? (
                             <p className="text-xs text-slate-400 px-3 py-2.5">Sonuç bulunamadı</p>
                         ) : (
-                            filtered.map(c => {
+                            filtered?.map(c => {
                                 const name = c.type === 'corporate' ? c.company_name : `${c.first_name} ${c.last_name}`;
                                 return (
                                     <button key={c.id} type="button"
@@ -264,7 +264,7 @@ export function StandaloneOfferCreateModal({ trigger, onSuccess }: StandaloneOff
     useEffect(() => {
         if (isOpen && activeProject) {
             api.get('/units', { params: { active_project_id: activeProject.id } })
-                .then(r => setUnits(r.data.data)).catch(() => { });
+                .then(r => setUnits(r.data.data || [])).catch(() => { });
         }
     }, [isOpen, activeProject]);
 
@@ -376,7 +376,7 @@ export function StandaloneOfferCreateModal({ trigger, onSuccess }: StandaloneOff
                                         <SelectTrigger><SelectValue placeholder="Birim Seçin (Opsiyonel)" /></SelectTrigger>
                                         <SelectContent>
                                             <SelectItem value="none" className="text-slate-400 italic">Seçilmedi</SelectItem>
-                                            {units.map(u => (
+                                            {units?.map(u => (
                                                 <SelectItem key={u.id} value={u.id.toString()}>
                                                     {(u as { block?: { name?: string } }).block?.name} - No: {u.unit_no}
                                                     {u.list_price ? ` (${Number(u.list_price).toLocaleString('tr-TR')} ₺)` : ''}

@@ -27,8 +27,8 @@ export default function CRMPage() {
                     api.get('/leads'),
                     api.get('/customers')
                 ]);
-                setLeads(leadsRes.data.data);
-                setCustomers(customersRes.data.data);
+                setLeads(leadsRes.data.data || []);
+                setCustomers(customersRes.data.data || []);
             } catch (error) {
                 console.error("Veriler alınamadı", error);
                 toast.error("CRM verileri yüklenirken bir sorun oluştu.");
