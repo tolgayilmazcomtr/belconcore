@@ -264,7 +264,7 @@ export function StandaloneOfferCreateModal({ trigger, onSuccess }: StandaloneOff
     useEffect(() => {
         if (isOpen && activeProject) {
             api.get('/units', { params: { active_project_id: activeProject.id } })
-                .then(r => setUnits(r.data.data || [])).catch(() => { });
+                .then(r => setUnits(Array.isArray(r.data) ? r.data : (r.data.data || []))).catch(() => { });
         }
     }, [isOpen, activeProject]);
 

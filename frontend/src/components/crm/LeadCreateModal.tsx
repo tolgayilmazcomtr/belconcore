@@ -54,7 +54,7 @@ export function LeadCreateModal({ editLead, trigger }: LeadCreateModalProps) {
             // Fetch units for the project to link to lead
             api.get('/units', {
                 params: { active_project_id: activeProject.id }
-            }).then(res => setUnits(res.data.data || [])).catch(() => { });
+            }).then(res => setUnits(Array.isArray(res.data) ? res.data : (res.data.data || []))).catch(() => { });
         }
     }, [activeProject, isOpen]);
 
