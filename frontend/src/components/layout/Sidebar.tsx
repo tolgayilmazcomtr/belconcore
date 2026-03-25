@@ -9,7 +9,7 @@ import {
   Building, Home, ChevronDown, TrendingUp, TrendingDown,
   Landmark, FileCheck, BarChart2, Calendar, Wallet,
   FileBarChart, Receipt, ShoppingCart, ShoppingBag,
-  Menu, X, ChevronRight, Search, Box
+  Menu, X, ChevronRight, Search, Box, Hammer
 } from "lucide-react";
 import { CommandPalette, COMMANDS } from "./CommandPalette";
 
@@ -73,6 +73,7 @@ const NAV: NavEntry[] = [
         kind: "section", label: "FİNANS",
         items: [
           { label: "Kasa ve Bankalar", href: "/accounting/finance", icon: <Landmark size={13} /> },
+          { label: "Maliyet Takip", href: "/accounting/costs", icon: <Hammer size={13} /> },
         ],
       },
       {

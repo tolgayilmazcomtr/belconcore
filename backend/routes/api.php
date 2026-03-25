@@ -16,6 +16,7 @@ use App\Http\Controllers\AccountingAccountController;
 use App\Http\Controllers\InvoiceController;
 use App\Http\Controllers\AccountingPaymentController;
 use App\Http\Controllers\FinanceAccountController;
+use App\Http\Controllers\CostItemController;
 
 // Public Auth Routes
 Route::post('/login', [AuthController::class, 'login']);
@@ -57,6 +58,16 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('accounting/payments', [AccountingPaymentController::class, 'index']);
         Route::post('accounting/payments', [AccountingPaymentController::class, 'store']);
         Route::delete('accounting/payments/{id}', [AccountingPaymentController::class, 'destroy']);
+
+        // Maliyet Takip
+        Route::get('costs/summary',  [CostItemController::class, 'summary']);
+        Route::get('costs/settings', [CostItemController::class, 'getSettings']);
+        Route::put('costs/settings', [CostItemController::class, 'updateSettings']);
+        Route::post('costs/reorder', [CostItemController::class, 'reorder']);
+        Route::get('costs',          [CostItemController::class, 'index']);
+        Route::post('costs',         [CostItemController::class, 'store']);
+        Route::put('costs/{id}',     [CostItemController::class, 'update']);
+        Route::delete('costs/{id}',  [CostItemController::class, 'destroy']);
 
         // Finans – Kasa & Bankalar
         Route::get('finance/accounts',                        [FinanceAccountController::class, 'indexAccounts']);
