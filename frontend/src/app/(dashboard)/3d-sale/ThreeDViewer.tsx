@@ -326,11 +326,12 @@ export default function ThreeDViewer() {
                 ctx.fillText(owner!.substring(0, 16), 128, 44);
             }
             const tex = new THREE.CanvasTexture(cvs2);
-            const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: true });
+            // depthTest:false → sprite her zaman görünür; yalnızca kameraya bakan yüzeyde göstermeyi
+            // animate loop'taki visible toggle ile sağlıyoruz
+            const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false });
             const sp = new THREE.Sprite(mat);
-            sp.scale.set(UW * 1.0, UH * 0.65, 1);
-            // Başlangıçta +Z yüzeyinin önüne konumlandır; animate loop'ta güncellenir
-            sp.position.set(0, 0, UD / 2 + 0.05);
+            sp.scale.set(UW * 0.95, UH * 0.6, 1);
+            sp.position.set(0, 0, UD / 2 + 0.02); // başlangıç; animate loop'ta güncellenir
             sp.userData.isLabel = true;
             return sp;
         }
@@ -424,6 +425,7 @@ export default function ThreeDViewer() {
                         const g = createUnitGroup(id);
                         g.position.set(ux, y, uz);
                         g.rotation.y = -angleRad;
+                        g.userData.blockAngle = angleRad; // label yön hesabı için
                         scene.add(g);
                         unitGroups[id] = g;
                     });
@@ -669,18 +671,12 @@ export default function ThreeDViewer() {
         canvas.addEventListener('touchmove', onTouchMove, { passive: false });
         canvas.addEventListener('touchend', onTouchEnd);
 
-        // Label yönlerini ve offset'lerini önceden tanımla (dörtlü yatay yüzey)
-        const labelFaceNormals = [
-            new THREE.Vector3(0, 0, 1),
-            new THREE.Vector3(0, 0, -1),
-            new THREE.Vector3(1, 0, 0),
-            new THREE.Vector3(-1, 0, 0),
-        ];
-        const labelFaceOffsets = [
-            new THREE.Vector3(0, 0, UD / 2 + 0.05),
-            new THREE.Vector3(0, 0, -(UD / 2 + 0.05)),
-            new THREE.Vector3(UW / 2 + 0.05, 0, 0),
-            new THREE.Vector3(-(UW / 2 + 0.05), 0, 0),
+        // Lokal yüz offset'leri (LOCAL space, tüm birimler aynı UW/UD/UH'a sahip)
+        const LOCAL_FACE_OFFSETS = [
+            new THREE.Vector3(0, 0,  UD / 2 + 0.02),  // +Z yüzü
+            new THREE.Vector3(0, 0, -(UD / 2 + 0.02)), // -Z yüzü
+            new THREE.Vector3( UW / 2 + 0.02, 0, 0),   // +X yüzü
+            new THREE.Vector3(-(UW / 2 + 0.02), 0, 0), // -X yüzü
         ];
         const _camDir = new THREE.Vector3();
 
@@ -689,24 +685,39 @@ export default function ThreeDViewer() {
         const animate = () => {
             reqId = requestAnimationFrame(animate);
 
-            // Kameraya en çok bakan yatay yüzü bul
+            // Dünya uzayında yatay kamera yönü
             _camDir.subVectors(camera.position, camTarget);
             _camDir.y = 0;
             const hLen = _camDir.length();
             if (hLen > 0.001) {
                 _camDir.divideScalar(hLen);
-                let bestIdx = 0, bestDot = -Infinity;
-                labelFaceNormals.forEach((n, i) => {
-                    const d = n.dot(_camDir);
-                    if (d > bestDot) { bestDot = d; bestIdx = i; }
-                });
-                const show = bestDot > 0.2;
-                const offset = labelFaceOffsets[bestIdx];
+                const wx = _camDir.x, wz = _camDir.z;
+
                 Object.values(unitGroups).forEach(g => {
+                    // Kamera yönünü grubun LOCAL uzayına çevir
+                    // (group.rotation.y = -blockAngle → tersi = +blockAngle)
+                    const angle = (g.userData.blockAngle ?? 0) as number;
+                    const ca = Math.cos(angle), sa = Math.sin(angle);
+                    const lx = wx * ca + wz * sa;
+                    const lz = -wx * sa + wz * ca;
+
+                    // 4 lokal yüz için dot products: +Z, -Z, +X, -X
+                    const dots = [lz, -lz, lx, -lx];
+                    let bestIdx = 0, bestDot = -Infinity;
+                    dots.forEach((d, i) => { if (d > bestDot) { bestDot = d; bestIdx = i; } });
+
+                    // Hysteresis: mevcut yüzden ancak %15 fark olunca geç
+                    const prevIdx = (g.userData.labelFaceIdx ?? bestIdx) as number;
+                    if (bestIdx !== prevIdx && bestDot < dots[prevIdx] + 0.15) {
+                        bestIdx = prevIdx;
+                        bestDot = dots[prevIdx];
+                    }
+                    g.userData.labelFaceIdx = bestIdx;
+
                     g.children.forEach(c => {
                         if (c.userData.isLabel) {
-                            c.position.copy(offset);
-                            c.visible = show;
+                            c.position.copy(LOCAL_FACE_OFFSETS[bestIdx]);
+                            c.visible = bestDot > 0.25; // sadece yeterince öne bakan yüzeyde göster
                         }
                     });
                 });
