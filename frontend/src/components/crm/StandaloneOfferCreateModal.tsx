@@ -236,7 +236,7 @@ export function StandaloneOfferCreateModal({ trigger, onSuccess }: StandaloneOff
     const [isLoading, setIsLoading] = useState(false);
     const [showQuickCustomer, setShowQuickCustomer] = useState(false);
     const { activeProject } = useProjectStore();
-    const { offers, setOffers, customers } = useCrmStore();
+    const { offers, setOffers, customers, setCustomers } = useCrmStore();
     const [units, setUnits] = useState<Unit[]>([]);
 
     const [formData, setFormData] = useState({
@@ -260,11 +260,17 @@ export function StandaloneOfferCreateModal({ trigger, onSuccess }: StandaloneOff
         setFormData(prev => ({ ...prev, final_price: fin >= 0 ? fin.toString() : '0' }));
     }, [formData.base_price, formData.discount_amount]);
 
-    // Load units on open
+    // Load units and customers on open
     useEffect(() => {
         if (isOpen && activeProject) {
             api.get('/units', { params: { active_project_id: activeProject.id } })
                 .then(r => setUnits(Array.isArray(r.data) ? r.data : (r.data.data || []))).catch(() => { });
+            // Always refresh customers when modal opens to ensure fresh list
+            api.get('/customers', { params: { active_project_id: activeProject.id } })
+                .then(r => {
+                    const list = Array.isArray(r.data) ? r.data : (r.data.data || []);
+                    if (list.length > 0) setCustomers(list);
+                }).catch(() => { });
         }
     }, [isOpen, activeProject]);
 

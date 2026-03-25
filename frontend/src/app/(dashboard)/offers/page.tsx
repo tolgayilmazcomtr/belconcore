@@ -173,7 +173,7 @@ export default function OffersPage() {
                         {f.label}
                         {f.value !== 'all' && (
                             <span className={`ml-1.5 text-xs ${statusFilter === f.value ? 'opacity-80' : 'opacity-60'}`}>
-                                {offers?.filter(o => o.status === f.value).length})
+                                ({offers?.filter(o => o.status === f.value).length})
                             </span>
                         )}
                     </button>
