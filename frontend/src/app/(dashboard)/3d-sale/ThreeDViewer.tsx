@@ -159,7 +159,16 @@ export default function ThreeDViewer() {
                     });
 
                     const floors = sortedFloorTags.map(t => floorMap.get(t)!);
-                    const faces = Array.from(faceSet);
+                    // Apply saved face order if available; fall back to insertion order
+                    const faceArray = Array.from(faceSet);
+                    let faces: string[];
+                    if (block.face_order && block.face_order.length > 0) {
+                        // Keep only faces that actually exist, then append any new ones not in saved order
+                        faces = block.face_order.filter(f => faceSet.has(f));
+                        faceArray.forEach(f => { if (!faces.includes(f)) faces.push(f); });
+                    } else {
+                        faces = faceArray;
+                    }
 
                     configs.push({ block, floors, floorTags: sortedFloorTags, faces, faceLabels });
 
@@ -180,9 +189,10 @@ export default function ThreeDViewer() {
                                 row: 0,
                                 cephe: faceLabels[faceCode] || faceCode,
                                 status: su ? (su.status as Status) : 'available',
-                                owner: '',
-                                phone: '',
-                                note: '',
+                                customer_id: su ? (su as any).customer_id ?? null : null,
+                                owner: su ? ((su as any).owner_name || '') : '',
+                                phone: su ? ((su as any).owner_phone || '') : '',
+                                note: su ? ((su as any).owner_note || '') : '',
                             };
                         });
                     });
@@ -316,7 +326,7 @@ export default function ThreeDViewer() {
                 ctx.fillText(owner.substring(0, 14), 128, 44);
             }
             const tex = new THREE.CanvasTexture(cvs2);
-            const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false });
+            const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: true });
             const sp = new THREE.Sprite(mat);
             sp.scale.set(UW * 1.0, UH * 0.65, 1);
             sp.position.y = 0;
@@ -367,7 +377,7 @@ export default function ThreeDViewer() {
             ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
             ctx.fillText(text, 256, 48);
             const tex = new THREE.CanvasTexture(c);
-            const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false });
+            const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: true });
             const sp = new THREE.Sprite(mat);
             sp.scale.set((scale || 1) * 5.5, (scale || 1) * 1.0, 1);
             return sp;
@@ -736,11 +746,13 @@ export default function ThreeDViewer() {
             const payload: any = {
                 unit_no: selectedId,
                 status: editForm.status,
-                net_area: editForm.net_area || null, // Optional tracking
+                net_area: editForm.net_area || null,
                 gross_area: editForm.gross_area || null,
                 list_price: editForm.list_price || null,
-                // We will send customer ID to backend manually if backend supports it directly on Unit.
-                // Otherwise we just save visual notes for now until full CRM backend bind is verified.
+                customer_id: editForm.customer_id || null,
+                owner_name: editForm.owner || null,
+                owner_phone: editForm.phone || null,
+                owner_note: editForm.note || null,
             };
 
             if (currentItem.system_id) {
@@ -904,7 +916,8 @@ export default function ThreeDViewer() {
                                                 />
                                                 <span className="text-[10px] text-slate-400">
                                                     {(() => {
-                                                        const n = 4; // örnek
+                                                        const cfg = blockConfigs.find(c => c.block.id === blk.id);
+                                                        const n = cfg ? cfg.faces.length : 4;
                                                         const pr = blk.faces_per_row ?? n;
                                                         const cols = Math.min(pr, n);
                                                         const rows = Math.ceil(n / cols);
@@ -913,6 +926,51 @@ export default function ThreeDViewer() {
                                                 </span>
                                             </div>
                                         </div>
+                                        {/* Cephe sırası ayarı */}
+                                        {(() => {
+                                            const cfg = blockConfigs.find(c => c.block.id === blk.id);
+                                            if (!cfg || cfg.faces.length < 2) return null;
+                                            return (
+                                                <div className="pt-1 border-t">
+                                                    <label className="text-[9px] text-slate-400 uppercase tracking-wide block mb-1">Cephe Sırası (3D'deki Kolon Sırası)</label>
+                                                    <div className="space-y-1">
+                                                        {cfg.faces.map((face, idx) => (
+                                                            <div key={face} className="flex items-center gap-1.5 bg-slate-50 border rounded px-2 py-1">
+                                                                <span className="text-[10px] font-mono font-bold text-slate-600 min-w-[28px]">{idx + 1}.</span>
+                                                                <span className="text-[10px] flex-1 text-slate-700">{face}</span>
+                                                                <div className="flex gap-0.5">
+                                                                    <button
+                                                                        disabled={idx === 0}
+                                                                        className="w-5 h-5 text-[10px] border rounded bg-white hover:bg-slate-100 disabled:opacity-30 flex items-center justify-center"
+                                                                        onClick={() => {
+                                                                            const newFaces = [...cfg.faces];
+                                                                            [newFaces[idx - 1], newFaces[idx]] = [newFaces[idx], newFaces[idx - 1]];
+                                                                            updateBlockLayout(blk.id, { face_order: newFaces });
+                                                                            setBlockConfigs(prev => prev.map(c =>
+                                                                                c.block.id === blk.id ? { ...c, faces: newFaces } : c
+                                                                            ));
+                                                                        }}
+                                                                    >▲</button>
+                                                                    <button
+                                                                        disabled={idx === cfg.faces.length - 1}
+                                                                        className="w-5 h-5 text-[10px] border rounded bg-white hover:bg-slate-100 disabled:opacity-30 flex items-center justify-center"
+                                                                        onClick={() => {
+                                                                            const newFaces = [...cfg.faces];
+                                                                            [newFaces[idx + 1], newFaces[idx]] = [newFaces[idx], newFaces[idx + 1]];
+                                                                            updateBlockLayout(blk.id, { face_order: newFaces });
+                                                                            setBlockConfigs(prev => prev.map(c =>
+                                                                                c.block.id === blk.id ? { ...c, faces: newFaces } : c
+                                                                            ));
+                                                                        }}
+                                                                    >▼</button>
+                                                                </div>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                    <p className="text-[8px] text-slate-400 mt-1">Ok tuşlarıyla sıralamayı değiştirin. Kaydet butonuyla kalıcı hale getirin.</p>
+                                                </div>
+                                            );
+                                        })()}
                                     </div>
                                 ))}
                             </div>
@@ -921,17 +979,19 @@ export default function ThreeDViewer() {
                                 onClick={async () => {
                                     setSavingLayout(true);
                                     try {
-                                        await Promise.all(layoutBlocks.map(blk =>
-                                            api.put(`/blocks/${blk.id}`, {
+                                        await Promise.all(layoutBlocks.map(blk => {
+                                            const cfg = blockConfigs.find(c => c.block.id === blk.id);
+                                            return api.put(`/blocks/${blk.id}`, {
                                                 name: blk.name,
                                                 code: blk.code,
                                                 scene_x: blk.scene_x ?? 0,
                                                 scene_z: blk.scene_z ?? 0,
                                                 scene_angle: blk.scene_angle ?? 0,
                                                 faces_per_row: blk.faces_per_row ?? 4,
+                                                face_order: blk.face_order ?? cfg?.faces ?? null,
                                                 active_project_id: activeProject?.id,
-                                            })
-                                        ));
+                                            });
+                                        }));
                                         // Reload to apply new positions
                                         setBlockConfigs([]);
                                         setData({});

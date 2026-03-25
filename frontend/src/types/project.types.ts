@@ -23,6 +23,7 @@ export interface Block {
     scene_z?: number;
     scene_angle?: number;
     faces_per_row?: number;
+    face_order?: string[];
     created_at?: string;
     updated_at?: string;
     units_count?: number;

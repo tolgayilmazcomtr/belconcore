@@ -20,7 +20,16 @@ class Unit extends Model
         'net_area',
         'status',
         'list_price',
+        'customer_id',
+        'owner_name',
+        'owner_phone',
+        'owner_note',
     ];
+
+    public function customer()
+    {
+        return $this->belongsTo(Customer::class);
+    }
 
     public function project()
     {

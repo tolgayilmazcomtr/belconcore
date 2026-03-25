@@ -38,6 +38,8 @@ class BlockController extends Controller
             'scene_z' => 'nullable|numeric',
             'scene_angle' => 'nullable|numeric',
             'faces_per_row' => 'nullable|integer|min:1|max:20',
+            'face_order' => 'nullable|array',
+            'face_order.*' => 'string',
         ]);
 
         $validated['project_id'] = $request->active_project_id;
@@ -73,6 +75,8 @@ class BlockController extends Controller
             'scene_z' => 'nullable|numeric',
             'scene_angle' => 'nullable|numeric',
             'faces_per_row' => 'nullable|integer|min:1|max:20',
+            'face_order' => 'nullable|array',
+            'face_order.*' => 'string',
         ]);
 
         if (!empty($validated['code'])) {

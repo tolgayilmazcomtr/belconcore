@@ -11,7 +11,7 @@ class UnitController extends Controller
      */
     public function index(Request $request)
     {
-        $query = \App\Models\Unit::where('project_id', $request->active_project_id)->with('block');
+        $query = \App\Models\Unit::where('project_id', $request->active_project_id)->with(['block', 'customer']);
 
         // Opsiyonel olarak block_id ile filtreleme yapılabilir
         if ($request->has('block_id')) {
@@ -142,14 +142,18 @@ class UnitController extends Controller
         $unit = \App\Models\Unit::findOrFail($id);
 
         $validated = $request->validate([
-            'block_id'   => 'sometimes|nullable|exists:blocks,id',
-            'unit_no'    => 'sometimes|required|string|max:50',
-            'floor_no'   => 'sometimes|nullable|string|max:50',
-            'unit_type'  => 'sometimes|required|string|max:50',
-            'gross_area' => 'sometimes|nullable|numeric|min:0',
-            'net_area'   => 'sometimes|nullable|numeric|min:0',
-            'status'     => 'sometimes|required|in:available,reserved,sold,not_for_sale',
-            'list_price' => 'sometimes|nullable|numeric|min:0',
+            'block_id'    => 'sometimes|nullable|exists:blocks,id',
+            'unit_no'     => 'sometimes|required|string|max:50',
+            'floor_no'    => 'sometimes|nullable|string|max:50',
+            'unit_type'   => 'sometimes|required|string|max:50',
+            'gross_area'  => 'sometimes|nullable|numeric|min:0',
+            'net_area'    => 'sometimes|nullable|numeric|min:0',
+            'status'      => 'sometimes|required|in:available,reserved,sold,not_for_sale',
+            'list_price'  => 'sometimes|nullable|numeric|min:0',
+            'customer_id' => 'sometimes|nullable|exists:customers,id',
+            'owner_name'  => 'sometimes|nullable|string|max:255',
+            'owner_phone' => 'sometimes|nullable|string|max:50',
+            'owner_note'  => 'sometimes|nullable|string|max:1000',
         ]);
 
         // unit_no veya block_id değiştiyse çakışma kontrolü

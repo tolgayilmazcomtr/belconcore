@@ -19,6 +19,11 @@ class Block extends Model
         'scene_z',
         'scene_angle',
         'faces_per_row',
+        'face_order',
+    ];
+
+    protected $casts = [
+        'face_order' => 'array',
     ];
 
     public function project()
