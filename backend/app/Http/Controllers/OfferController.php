@@ -27,7 +27,7 @@ class OfferController extends Controller
     public function store(Request $request)
     {
         $data = $request->validate([
-            'lead_id' => 'required|exists:leads,id',
+            'lead_id' => 'nullable|exists:leads,id',
             'customer_id' => 'required|exists:customers,id',
             'unit_id' => 'nullable|exists:units,id',
             'valid_until' => 'nullable|date',

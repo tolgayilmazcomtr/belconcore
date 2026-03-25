@@ -30,10 +30,15 @@ import { Textarea } from '@/components/ui/textarea';
 interface LeadCreateModalProps {
     editLead?: Lead;
     trigger?: React.ReactNode;
+    forceOpen?: boolean;
+    onClose?: () => void;
+    onSuccess?: () => void;
 }
 
-export function LeadCreateModal({ editLead, trigger }: LeadCreateModalProps) {
+export function LeadCreateModal({ editLead, trigger, forceOpen, onClose, onSuccess }: LeadCreateModalProps) {
     const [isOpen, setIsOpen] = useState(false);
+    const open = forceOpen !== undefined ? forceOpen : isOpen;
+    const setOpen = (val: boolean) => { setIsOpen(val); if (!val && onClose) onClose(); };
     const [isLoading, setIsLoading] = useState(false);
     const { activeProject } = useProjectStore();
     const { leads, setLeads, customers } = useCrmStore();
@@ -50,16 +55,16 @@ export function LeadCreateModal({ editLead, trigger }: LeadCreateModalProps) {
     });
 
     useEffect(() => {
-        if (activeProject && isOpen) {
+        if (activeProject && open) {
             // Fetch units for the project to link to lead
             api.get('/units', {
                 params: { active_project_id: activeProject.id }
             }).then(res => setUnits(Array.isArray(res.data) ? res.data : (res.data.data || []))).catch(() => { });
         }
-    }, [activeProject, isOpen]);
+    }, [activeProject, open]);
 
     useEffect(() => {
-        if (editLead && isOpen) {
+        if (editLead && open) {
             setFormData({
                 title: editLead.title || '',
                 customer_id: editLead.customer_id?.toString() || '',
@@ -69,7 +74,7 @@ export function LeadCreateModal({ editLead, trigger }: LeadCreateModalProps) {
                 description: editLead.description || '',
                 status: editLead.status || 'new',
             });
-        } else if (!isOpen) {
+        } else if (!open) {
             setFormData({
                 title: '',
                 customer_id: '',
@@ -80,7 +85,7 @@ export function LeadCreateModal({ editLead, trigger }: LeadCreateModalProps) {
                 status: 'new',
             });
         }
-    }, [editLead, isOpen]);
+    }, [editLead, open]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -109,7 +114,8 @@ export function LeadCreateModal({ editLead, trigger }: LeadCreateModalProps) {
                 setLeads([...leads, response.data.data]);
                 toast.success('Yeni fırsat başarıyla oluşturuldu.');
             }
-            setIsOpen(false);
+            setOpen(false);
+            if (onSuccess) onSuccess();
         } catch (error: any) {
             toast.error('İşlem başarısız', {
                 description: error.response?.data?.message || 'Bir hata oluştu. Lütfen tekrar deneyin.'
@@ -120,7 +126,7 @@ export function LeadCreateModal({ editLead, trigger }: LeadCreateModalProps) {
     };
 
     return (
-        <Dialog open={isOpen} onOpenChange={setIsOpen}>
+        <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
                 {trigger ? trigger : (
                     <Button className="h-9 font-medium shadow-sm">
@@ -265,7 +271,7 @@ export function LeadCreateModal({ editLead, trigger }: LeadCreateModalProps) {
                 </form>
 
                 <div className="bg-slate-50 border-t px-6 py-4 flex justify-end gap-3">
-                    <Button variant="outline" onClick={() => setIsOpen(false)} type="button">
+                    <Button variant="outline" onClick={() => setOpen(false)} type="button">
                         İptal
                     </Button>
                     <Button onClick={handleSubmit} disabled={isLoading} className="min-w-[120px]">
