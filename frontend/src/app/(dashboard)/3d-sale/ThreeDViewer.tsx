@@ -311,25 +311,26 @@ export default function ThreeDViewer() {
         }
 
         function makeLabel(id: string, owner?: string, status?: Status) {
+            const showOwner = status === 'sold' && !!owner;
             const cvs2 = document.createElement('canvas');
             cvs2.width = 256; cvs2.height = 64;
             const ctx = cvs2.getContext('2d')!;
-            ctx.fillStyle = 'rgba(255,255,255,0.0)';
-            ctx.fillRect(0, 0, 256, 64);
+            ctx.clearRect(0, 0, 256, 64);
             ctx.fillStyle = 'rgba(255,255,255,0.95)';
             ctx.font = 'bold 20px Montserrat,sans-serif';
             ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-            ctx.fillText(id, 128, owner ? 20 : 32);
-            if (owner) {
-                ctx.font = '14px Montserrat,sans-serif';
-                ctx.fillStyle = 'rgba(255,255,255,0.78)';
-                ctx.fillText(owner.substring(0, 14), 128, 44);
+            ctx.fillText(id, 128, showOwner ? 20 : 32);
+            if (showOwner) {
+                ctx.font = '13px Montserrat,sans-serif';
+                ctx.fillStyle = 'rgba(255,220,220,0.92)';
+                ctx.fillText(owner!.substring(0, 16), 128, 44);
             }
             const tex = new THREE.CanvasTexture(cvs2);
             const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: true });
             const sp = new THREE.Sprite(mat);
             sp.scale.set(UW * 1.0, UH * 0.65, 1);
-            sp.position.y = 0;
+            // Başlangıçta +Z yüzeyinin önüne konumlandır; animate loop'ta güncellenir
+            sp.position.set(0, 0, UD / 2 + 0.05);
             sp.userData.isLabel = true;
             return sp;
         }
@@ -668,10 +669,49 @@ export default function ThreeDViewer() {
         canvas.addEventListener('touchmove', onTouchMove, { passive: false });
         canvas.addEventListener('touchend', onTouchEnd);
 
+        // Label yönlerini ve offset'lerini önceden tanımla (dörtlü yatay yüzey)
+        const labelFaceNormals = [
+            new THREE.Vector3(0, 0, 1),
+            new THREE.Vector3(0, 0, -1),
+            new THREE.Vector3(1, 0, 0),
+            new THREE.Vector3(-1, 0, 0),
+        ];
+        const labelFaceOffsets = [
+            new THREE.Vector3(0, 0, UD / 2 + 0.05),
+            new THREE.Vector3(0, 0, -(UD / 2 + 0.05)),
+            new THREE.Vector3(UW / 2 + 0.05, 0, 0),
+            new THREE.Vector3(-(UW / 2 + 0.05), 0, 0),
+        ];
+        const _camDir = new THREE.Vector3();
+
         // Animation loop
         let reqId: number;
         const animate = () => {
             reqId = requestAnimationFrame(animate);
+
+            // Kameraya en çok bakan yatay yüzü bul
+            _camDir.subVectors(camera.position, camTarget);
+            _camDir.y = 0;
+            const hLen = _camDir.length();
+            if (hLen > 0.001) {
+                _camDir.divideScalar(hLen);
+                let bestIdx = 0, bestDot = -Infinity;
+                labelFaceNormals.forEach((n, i) => {
+                    const d = n.dot(_camDir);
+                    if (d > bestDot) { bestDot = d; bestIdx = i; }
+                });
+                const show = bestDot > 0.2;
+                const offset = labelFaceOffsets[bestIdx];
+                Object.values(unitGroups).forEach(g => {
+                    g.children.forEach(c => {
+                        if (c.userData.isLabel) {
+                            c.position.copy(offset);
+                            c.visible = show;
+                        }
+                    });
+                });
+            }
+
             renderer.render(scene, camera);
         };
         animate();
