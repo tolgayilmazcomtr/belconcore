@@ -326,12 +326,11 @@ export default function ThreeDViewer() {
                 ctx.fillText(owner!.substring(0, 16), 128, 44);
             }
             const tex = new THREE.CanvasTexture(cvs2);
-            // depthTest:false → sprite her zaman görünür; yalnızca kameraya bakan yüzeyde göstermeyi
-            // animate loop'taki visible toggle ile sağlıyoruz
-            const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false });
+            // depthTest:true → depth buffer arkadaki label'ları otomatik gizler
+            const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: true });
             const sp = new THREE.Sprite(mat);
             sp.scale.set(UW * 0.95, UH * 0.6, 1);
-            sp.position.set(0, 0, UD / 2 + 0.02); // başlangıç; animate loop'ta güncellenir
+            sp.position.set(0, 0, UD / 2 + 0.15); // başlangıç; animate loop'ta güncellenir (z-fighting önlemek için offset artırıldı)
             sp.userData.isLabel = true;
             return sp;
         }
@@ -673,10 +672,10 @@ export default function ThreeDViewer() {
 
         // Lokal yüz offset'leri (LOCAL space, tüm birimler aynı UW/UD/UH'a sahip)
         const LOCAL_FACE_OFFSETS = [
-            new THREE.Vector3(0, 0,  UD / 2 + 0.02),  // +Z yüzü
-            new THREE.Vector3(0, 0, -(UD / 2 + 0.02)), // -Z yüzü
-            new THREE.Vector3( UW / 2 + 0.02, 0, 0),   // +X yüzü
-            new THREE.Vector3(-(UW / 2 + 0.02), 0, 0), // -X yüzü
+            new THREE.Vector3(0, 0,  UD / 2 + 0.15),  // +Z yüzü
+            new THREE.Vector3(0, 0, -(UD / 2 + 0.15)), // -Z yüzü
+            new THREE.Vector3( UW / 2 + 0.15, 0, 0),   // +X yüzü
+            new THREE.Vector3(-(UW / 2 + 0.15), 0, 0), // -X yüzü
         ];
         const _camDir = new THREE.Vector3();
 
