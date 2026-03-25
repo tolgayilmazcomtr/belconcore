@@ -33,8 +33,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('projects', ProjectController::class);
 
     // Seçili Proje İçi Modüller (Blok ve Bağımsız Bölüm)
-    // Offer PDF - project.access dışında, doğrudan auth ile erişilir
+    // PDF endpoints - project.access dışında, doğrudan auth ile erişilir
         Route::get('offers/{offer}/pdf', [OfferController::class, 'generatePdf']);
+        Route::get('accounting/invoices/{id}/pdf', [InvoiceController::class, 'generatePdf']);
 
         Route::middleware('project.access')->group(function () {
         Route::apiResource('blocks', BlockController::class);

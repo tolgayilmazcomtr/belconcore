@@ -17,11 +17,11 @@ export default function AccountingPage() {
     useEffect(() => {
         if (!activeProject) return;
         Promise.all([
-            api.get('/accounting/accounts', { params: { active_project_id: activeProject.id } }),
-            api.get('/accounting/invoices', { params: { active_project_id: activeProject.id } }),
+            api.get('/accounting/accounts', { params: { active_project_id: activeProject.id, per_page: 1000 } }),
+            api.get('/accounting/invoices', { params: { active_project_id: activeProject.id, per_page: 1000 } }),
         ]).then(([a, i]) => {
-            setAccounts(a.data.data);
-            setInvoices(i.data.data);
+            setAccounts(Array.isArray(a.data) ? a.data : (a.data.data || []));
+            setInvoices(Array.isArray(i.data) ? i.data : (i.data.data || []));
         }).catch(() => { });
     }, [activeProject, setAccounts, setInvoices]);
 

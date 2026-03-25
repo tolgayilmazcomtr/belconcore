@@ -7,6 +7,7 @@ use App\Models\InvoiceItem;
 use App\Models\AccountingAccount;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Barryvdh\DomPDF\Facade\Pdf;
 
 class InvoiceController extends Controller
 {
@@ -33,7 +34,8 @@ class InvoiceController extends Controller
             });
         }
 
-        $invoices = $query->orderByDesc('date')->orderByDesc('id')->paginate(50);
+        $perPage = min((int) ($request->per_page ?? 50), 1000);
+        $invoices = $query->orderByDesc('date')->orderByDesc('id')->paginate($perPage);
         return response()->json($invoices);
     }
 
@@ -196,5 +198,22 @@ class InvoiceController extends Controller
         $invoice = Invoice::findOrFail($id);
         $invoice->delete();
         return response()->json(['message' => 'Fatura silindi.']);
+    }
+
+    public function generatePdf(string $id)
+    {
+        $invoice = Invoice::with(['account', 'items', 'payments', 'project'])->findOrFail($id);
+
+        $typeLabel = $invoice->type === 'sales' ? 'SATIŞ FATURASI' : 'ALIŞ FATURASI';
+        $statusLabels = ['draft' => 'Taslak', 'sent' => 'Gönderildi', 'paid' => 'Ödendi', 'partial' => 'Kısmi Ödeme', 'cancelled' => 'İptal'];
+        $methodLabels = ['cash' => 'Nakit', 'bank' => 'Banka', 'check' => 'Çek', 'credit_card' => 'Kredi Kartı', 'other' => 'Diğer'];
+        $statusLabel = $statusLabels[$invoice->status] ?? $invoice->status;
+
+        $html = view('pdf.invoice', compact('invoice', 'typeLabel', 'statusLabel', 'methodLabels'))->render();
+
+        $pdf = Pdf::loadHTML($html)->setPaper('a4', 'portrait');
+        $filename = 'fatura-' . ($invoice->invoice_no ?? $invoice->id) . '.pdf';
+
+        return $pdf->download($filename);
     }
 }

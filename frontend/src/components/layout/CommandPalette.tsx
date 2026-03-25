@@ -33,7 +33,6 @@ export const COMMANDS: CommandItem[] = [
     { label: 'Satışlar', href: '/accounting/sales', section: 'FATURALAR', shortcut: ['G', 'S'], keywords: 'satış fatura' },
     { label: 'Alışlar', href: '/accounting/purchases', section: 'FATURALAR', shortcut: ['G', 'A'], keywords: 'alış fatura tedarikçi' },
     { label: 'Kasa ve Bankalar', href: '/accounting/finance', section: 'FİNANS', shortcut: ['G', 'K'], keywords: 'kasa banka nakit' },
-    { label: 'Çek ve Senetler', href: '/accounting/checks', section: 'FİNANS', shortcut: ['G', 'V'], keywords: 'çek senet' },
     { label: 'Gün Sonu Raporu', href: '/accounting/reports/daily', section: 'RAPORLAR', shortcut: ['G', 'R'], keywords: 'gün sonu rapor' },
     { label: 'KDV Raporu', href: '/accounting/reports/vat', section: 'RAPORLAR', keywords: 'kdv vergi' },
     { label: 'Alacak Raporu', href: '/accounting/reports/receivable', section: 'RAPORLAR', keywords: 'alacak' },
