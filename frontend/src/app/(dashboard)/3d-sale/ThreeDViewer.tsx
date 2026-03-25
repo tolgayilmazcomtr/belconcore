@@ -1204,17 +1204,33 @@ export default function ThreeDViewer() {
 
                 {/* SIDEBAR LIST (Desktop & Mobile Sheet) */}
                 <div className={`${isMobileSidebarOpen ? 'translate-x-0' : 'translate-x-full'} md:translate-x-0 fixed md:relative z-40 top-[52px] md:top-0 right-0 bottom-0 md:h-auto w-[280px] md:w-[270px] bg-white border-l border-[#DDE1E7] flex flex-col shrink-0 transition-transform duration-300 shadow-2xl md:shadow-none`}>
-                    <div className="p-[14px] md:p-[18px] border-b border-[#DDE1E7] flex items-center gap-2 relative">
-                        <div className="font-[Bebas_Neue] text-base md:text-lg tracking-[3px] md:tracking-[4px] text-[#C8102E]">Daireler</div>
-                        <div className="bg-[#fdeef1] text-[#C8102E] text-[9px] md:text-[10px] font-bold px-2 py-0.5 rounded-full">{filteredUnits.length}</div>
-                        {isMobileSidebarOpen && (
-                            <button
-                                className="md:hidden absolute right-3 text-[#8892A0] p-1 bg-slate-100 rounded hover:bg-slate-200"
-                                onClick={() => setIsMobileSidebarOpen(false)}
-                            >
-                                <X size={16} />
-                            </button>
-                        )}
+                    <div className="p-[14px] md:p-[18px] border-b border-[#DDE1E7] relative">
+                        <div className="flex items-center gap-2">
+                            <div className="font-[Bebas_Neue] text-base md:text-lg tracking-[3px] md:tracking-[4px] text-[#C8102E]">Daireler</div>
+                            <div className="bg-[#fdeef1] text-[#C8102E] text-[9px] md:text-[10px] font-bold px-2 py-0.5 rounded-full">{stats.total}</div>
+                            {isMobileSidebarOpen && (
+                                <button
+                                    className="md:hidden absolute right-3 top-3 text-[#8892A0] p-1 bg-slate-100 rounded hover:bg-slate-200"
+                                    onClick={() => setIsMobileSidebarOpen(false)}
+                                >
+                                    <X size={16} />
+                                </button>
+                            )}
+                        </div>
+                        <div className="flex gap-2 mt-2 flex-wrap">
+                            {[
+                                { status: 'available' as Status, label: 'Açık', val: stats.available },
+                                { status: 'sold' as Status, label: 'Satıldı', val: stats.sold },
+                                { status: 'reserved' as Status, label: 'Rezerve', val: stats.reserved },
+                                { status: 'not_for_sale' as Status, label: 'Kapalı', val: stats.closed },
+                            ].map(s => (
+                                <div key={s.status} className="flex items-center gap-1">
+                                    <div className="w-1.5 h-1.5 rounded-sm" style={{ backgroundColor: SC_CSS[s.status] }}></div>
+                                    <span className="text-[9px] text-[#8892A0]">{s.label}</span>
+                                    <span className="text-[9px] font-bold" style={{ color: SC_CSS[s.status] }}>{s.val}</span>
+                                </div>
+                            ))}
+                        </div>
                     </div>
                     <div className="p-2.5 md:p-3.5 border-b border-[#DDE1E7] flex gap-1.5 flex-wrap">
                         {['all', 'available', 'sold', 'reserved', 'not_for_sale'].map(f => (
