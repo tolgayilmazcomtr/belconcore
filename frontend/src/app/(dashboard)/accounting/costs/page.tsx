@@ -810,8 +810,12 @@ export default function CostsPage() {
                         {categories.map(cat => {
                             const catItems = grouped.get(cat) || [];
                             const catPlanned = catItems.reduce((s, i) => s + (i.planned_total || 0), 0);
-                            const catActual = catItems.reduce((s, i) => s + (i.actual_total || 0), 0);
-                            const catVar = catActual > 0 ? catActual - catPlanned : null;
+                            // Blended: gerçek fiyat varsa onu, yoksa planlanmış fiyatı kullan
+                            const catHasAny = catItems.some(i => i.actual_total != null);
+                            const catBlended = catHasAny
+                                ? catItems.reduce((s, i) => s + (i.actual_total ?? i.planned_total ?? 0), 0)
+                                : null;
+                            const catVar = catBlended !== null ? catBlended - catPlanned : null;
                             const collapsed = collapsedCategories.has(cat);
 
                             return (
@@ -828,7 +832,7 @@ export default function CostsPage() {
                                         </span>
                                         <span className="text-right" />
                                         <span className="text-right text-xs font-mono font-semibold text-slate-600">{fmt(catPlanned)}</span>
-                                        <span className="text-right text-xs font-mono font-semibold text-slate-600">{catActual > 0 ? fmt(catActual) : '—'}</span>
+                                        <span className="text-right text-xs font-mono font-semibold text-slate-600">{catBlended !== null ? fmt(catBlended) : '—'}</span>
                                         <span className={`text-right text-xs font-mono font-semibold ${catVar === null ? 'text-slate-300' : catVar <= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
                                             {catVar === null ? '—' : `${catVar <= 0 ? '' : '+'}${fmt(Math.abs(catVar))}`}
                                         </span>
