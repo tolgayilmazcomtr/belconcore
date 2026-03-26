@@ -73,6 +73,8 @@ const NAV: NavEntry[] = [
         kind: "section", label: "FİNANS",
         items: [
           { label: "Kasa ve Bankalar", href: "/accounting/finance", icon: <Landmark size={13} /> },
+          { label: "Sözleşmeler", href: "/accounting/contracts", icon: <FileCheck size={13} /> },
+          { label: "Çek & Senetler", href: "/accounting/checks", icon: <Receipt size={13} /> },
           { label: "Maliyet Takip", href: "/accounting/costs", icon: <Hammer size={13} /> },
         ],
       },

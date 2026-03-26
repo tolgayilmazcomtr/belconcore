@@ -18,6 +18,7 @@ use App\Http\Controllers\AccountingPaymentController;
 use App\Http\Controllers\FinanceAccountController;
 use App\Http\Controllers\CostItemController;
 use App\Http\Controllers\CheckController;
+use App\Http\Controllers\ContractController;
 
 // Public Auth Routes
 Route::post('/login', [AuthController::class, 'login']);
@@ -69,6 +70,14 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('costs',         [CostItemController::class, 'store']);
         Route::put('costs/{id}',     [CostItemController::class, 'update']);
         Route::delete('costs/{id}',  [CostItemController::class, 'destroy']);
+
+        // Sözleşme & Ödeme Planı
+        Route::get('contracts/summary', [ContractController::class, 'summary']);
+        Route::apiResource('contracts', ContractController::class);
+        Route::get('contracts/{contract}/installments', [ContractController::class, 'installments']);
+        Route::post('contracts/{contract}/installments', [ContractController::class, 'storeInstallment']);
+        Route::put('contracts/{contract}/installments/{installment}', [ContractController::class, 'updateInstallment']);
+        Route::delete('contracts/{contract}/installments/{installment}', [ContractController::class, 'destroyInstallment']);
 
         // Çek & Senet Yönetimi
         Route::get('checks/summary',  [CheckController::class, 'summary']);

@@ -5,7 +5,7 @@ import api from '@/lib/api';
 import {
     Building2, TrendingUp, TrendingDown, Home, Users,
     FileText, Wallet, AlertCircle, CheckCircle2, Clock,
-    BarChart3, ArrowUpRight, ArrowDownRight, Minus,
+    BarChart3, ArrowUpRight, ArrowDownRight, Minus, FileSignature, AlertTriangle,
 } from 'lucide-react';
 
 const fmt = (n: number) => '₺' + new Intl.NumberFormat('tr-TR', { minimumFractionDigits: 0 }).format(n || 0);
@@ -21,6 +21,7 @@ interface Stats {
     invoices: { salesTotal: number; purchasesTotal: number; receivable: number; payable: number };
     finance: { balance: number; incomeMonth: number; expenseMonth: number };
     costs: { planned: number; blended: number; perUnitPlanned: number; perUnitBlended: number; unitCount: number };
+    contracts: { overdueCount: number; overdueAmount: number; upcomingCount: number; upcomingAmount: number; items: any[] };
 }
 
 function MiniBar({ value, max, color }: { value: number; max: number; color: string }) {
@@ -72,7 +73,8 @@ export default function DashboardPage() {
             api.get('/finance/summary', { params: { active_project_id: pid } }),
             api.get('/finance/transactions', { params: { active_project_id: pid, per_page: 1000, date_from: dateFrom, date_to: dateTo } }),
             api.get('/costs/summary', { params: { active_project_id: pid } }),
-        ]).then(([unitsRes, leadsRes, invRes, finSummaryRes, txRes, costRes]) => {
+            api.get('/contracts', { params: { active_project_id: pid } }).catch(() => ({ data: { data: [] } })),
+        ]).then(([unitsRes, leadsRes, invRes, finSummaryRes, txRes, costRes, contractsRes]) => {
             const units: any[] = Array.isArray(unitsRes.data) ? unitsRes.data : (unitsRes.data?.data || []);
             const leads: any[] = Array.isArray(leadsRes.data) ? leadsRes.data : (leadsRes.data?.data || []);
             const invoices: any[] = invRes.data?.data || [];
@@ -108,6 +110,14 @@ export default function DashboardPage() {
             const incomeMonth = txs.filter((t: any) => t.type === 'income').reduce((s: number, t: any) => s + t.amount, 0);
             const expenseMonth = txs.filter((t: any) => t.type === 'expense').reduce((s: number, t: any) => s + t.amount, 0);
 
+            const allContracts: any[] = contractsRes.data?.data || [];
+            const today = new Date();
+            const in30 = new Date(today.getTime() + 30 * 86400000);
+            const allInst = allContracts.flatMap((c: any) => (c.installments || []).map((i: any) => ({ ...i, contractTitle: c.title, counterparty: c.counterparty })));
+            const pending = allInst.filter((i: any) => i.status === 'pending' || i.status === 'overdue');
+            const overdue = pending.filter((i: any) => new Date(i.due_date) < today);
+            const upcoming30 = pending.filter((i: any) => { const d = new Date(i.due_date); return d >= today && d <= in30; });
+
             setStats({
                 units: unitStats,
                 leads: leadStats,
@@ -119,6 +129,13 @@ export default function DashboardPage() {
                     perUnitPlanned: costSummary.planned_per_unit || 0,
                     perUnitBlended: costSummary.actual_per_unit || 0,
                     unitCount: costSummary.unit_count || 0,
+                },
+                contracts: {
+                    overdueCount: overdue.length,
+                    overdueAmount: overdue.reduce((s: number, i: any) => s + i.amount, 0),
+                    upcomingCount: upcoming30.length,
+                    upcomingAmount: upcoming30.reduce((s: number, i: any) => s + i.amount, 0),
+                    items: [...overdue, ...upcoming30].sort((a, b) => new Date(a.due_date).getTime() - new Date(b.due_date).getTime()).slice(0, 8),
                 },
             });
         }).catch(console.error).finally(() => setLoading(false));
@@ -144,7 +161,7 @@ export default function DashboardPage() {
         );
     }
 
-    const { units, leads, invoices, finance, costs } = stats;
+    const { units, leads, invoices, finance, costs, contracts } = stats;
     const costVariance = costs.blended - costs.planned;
     const costVariancePct = costs.planned > 0 ? ((costVariance / costs.planned) * 100) : 0;
     const soldRevenue = invoices.salesTotal;
@@ -412,6 +429,48 @@ export default function DashboardPage() {
                                 )}
                             </div>
                         ))}
+                    </div>
+                </div>
+            )}
+
+            {/* Contracts / Upcoming Installments */}
+            {(contracts.overdueCount > 0 || contracts.upcomingCount > 0) && (
+                <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                    <div className="flex items-center gap-3 px-5 py-3 border-b border-slate-100">
+                        <FileSignature className="w-4 h-4 text-slate-500" />
+                        <h3 className="text-xs font-semibold text-slate-700 uppercase tracking-wide">Yaklaşan Taksit & Ödemeler</h3>
+                        {contracts.overdueCount > 0 && (
+                            <span className="ml-auto flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 bg-red-100 text-red-700 rounded-full">
+                                <AlertTriangle className="w-2.5 h-2.5" /> {contracts.overdueCount} vadesi geçmiş
+                            </span>
+                        )}
+                        {contracts.upcomingCount > 0 && (
+                            <span className={`${contracts.overdueCount > 0 ? '' : 'ml-auto'} flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 bg-amber-100 text-amber-700 rounded-full`}>
+                                <Clock className="w-2.5 h-2.5" /> {contracts.upcomingCount} bu ay
+                            </span>
+                        )}
+                    </div>
+                    <div className="divide-y divide-slate-50">
+                        {contracts.items.map((item: any, idx: number) => {
+                            const due = new Date(item.due_date);
+                            const days = Math.round((due.getTime() - new Date().getTime()) / 86400000);
+                            const isOverdue = days < 0;
+                            return (
+                                <div key={idx} className="flex items-center gap-3 px-5 py-2.5 hover:bg-slate-50">
+                                    <div className={`w-1.5 h-8 rounded-full shrink-0 ${isOverdue ? 'bg-red-400' : days <= 7 ? 'bg-orange-400' : 'bg-amber-300'}`} />
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-xs font-medium text-slate-800 truncate">{item.contractTitle} · {item.description || `Taksit #${item.installment_no}`}</p>
+                                        <p className="text-[10px] text-slate-400">{item.counterparty || ''}</p>
+                                    </div>
+                                    <div className="text-right shrink-0">
+                                        <p className="text-xs font-mono font-semibold text-slate-800">{fmtK(item.amount)}</p>
+                                        <p className={`text-[10px] ${isOverdue ? 'text-red-600 font-bold' : days <= 7 ? 'text-orange-500' : 'text-amber-600'}`}>
+                                            {isOverdue ? `${Math.abs(days)}g geçti` : days === 0 ? 'Bugün' : `${days}g kaldı`}
+                                        </p>
+                                    </div>
+                                </div>
+                            );
+                        })}
                     </div>
                 </div>
             )}
