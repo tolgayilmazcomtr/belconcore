@@ -307,7 +307,7 @@ export default function NewSalesInvoicePage() {
                                 <span className="font-mono">₺{fmtMoney(taxTotal)}</span>
                             </div>
                             <div className="flex justify-between px-4 py-2 text-sm text-slate-800 bg-slate-50">
-                                <span className="uppercase tracking-wide font-bold">ÖDENEcek TUTAR</span>
+                                <span className="uppercase tracking-wide font-bold">ÖDENECEK TUTAR</span>
                                 <span className="font-mono font-bold">₺{fmtMoney(total)}</span>
                             </div>
                         </div>

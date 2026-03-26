@@ -87,6 +87,8 @@ export default function NewPurchasePage() {
     const handleSave = async () => {
         if (!activeProject) return;
         if (!form.account_id) { toast.error('Tedarikçi seçimi zorunludur.'); return; }
+        if (items.some(i => !i.description)) { toast.error('Tüm kalemlerin açıklaması zorunludur.'); return; }
+        if (items.some(i => !i.unit_price || Number(i.unit_price) <= 0)) { toast.error('Geçerli birim fiyat giriniz.'); return; }
         setSaving(true);
         try {
             const r = await api.post('/accounting/invoices', { ...form, account_id: parseInt(form.account_id), type: 'purchase', active_project_id: activeProject.id, items: items.map(({ _id, ...rest }) => rest) });
