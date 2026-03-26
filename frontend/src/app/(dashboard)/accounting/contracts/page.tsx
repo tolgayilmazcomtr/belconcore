@@ -1,18 +1,17 @@
 'use client';
 
-import React, { useEffect, useState, useMemo, useCallback } from 'react';
-import ReactDOM from 'react-dom';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useProjectStore } from '@/store/useProjectStore';
 import api from '@/lib/api';
 import { toast } from 'sonner';
 import {
-    FileSignature, Plus, ChevronDown, ChevronUp, Edit2, Trash2,
-    X, CheckCircle2, Clock, AlertTriangle, ArrowUpRight, ArrowDownLeft,
-    Home, Wallet, MoreVertical, Check, Circle, AlertCircle,
-    Building2, Users, Hammer, ShoppingBag,
+  FileText, Plus, Edit2, Trash2, X, CheckCircle2, Clock, AlertTriangle,
+  ArrowUpRight, ArrowDownLeft, Building2, Users, Hammer, ShoppingBag,
+  Download, Upload, ChevronLeft, CreditCard, Receipt, Calendar,
+  FileCheck, AlertCircle, Circle,
 } from 'lucide-react';
 
-// ─── Types ───────────────────────────────────────────────────────────────────
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 type ContractType = 'customer_sale' | 'contractor' | 'supplier' | 'other';
 type ContractStatus = 'draft' | 'active' | 'completed' | 'cancelled';
@@ -20,804 +19,1133 @@ type PaymentType = 'cash' | 'bank' | 'check' | 'apartment' | 'other';
 type InstallmentStatus = 'pending' | 'paid' | 'overdue' | 'cancelled';
 
 interface Installment {
-    id: number;
-    contract_id: number;
-    installment_no: number;
-    description?: string;
-    amount: number;
-    due_date: string;
-    payment_type: PaymentType;
-    unit_id?: number;
-    status: InstallmentStatus;
-    paid_amount: number;
-    paid_date?: string;
-    notes?: string;
-    days_until_due?: number;
+  id: number;
+  contract_id: number;
+  installment_no: number;
+  description?: string;
+  amount: number;
+  due_date: string;
+  payment_type: PaymentType;
+  unit_id?: number;
+  status: InstallmentStatus;
+  paid_amount: number;
+  paid_date?: string;
+  notes?: string;
 }
 
 interface Contract {
-    id: number;
-    type: ContractType;
-    title: string;
-    counterparty?: string;
-    total_value: number;
-    start_date?: string;
-    end_date?: string;
-    status: ContractStatus;
-    description?: string;
-    installments: Installment[];
-    paid_amount?: number;
-    remaining_amount?: number;
-    overdue_count?: number;
-    next_due?: string;
+  id: number;
+  type: ContractType;
+  title: string;
+  counterparty?: string;
+  total_value: number;
+  start_date?: string;
+  end_date?: string;
+  status: ContractStatus;
+  description?: string;
+  installments: Installment[];
+  paid_amount?: number;
+  remaining_amount?: number;
+  overdue_count?: number;
+  next_due?: string;
+  document_path?: string;
+  document_name?: string;
 }
 
-// ─── Constants ───────────────────────────────────────────────────────────────
+interface AccountingAccount {
+  id: number;
+  name: string;
+  code?: string;
+}
+
+// ─── Constants ────────────────────────────────────────────────────────────────
 
 const CONTRACT_TYPE_LABELS: Record<ContractType, string> = {
-    customer_sale: 'Müşteri Satışı', contractor: 'Taşeron', supplier: 'Tedarikçi', other: 'Diğer',
+  customer_sale: 'Müşteri Satış',
+  contractor: 'Yüklenici',
+  supplier: 'Tedarikçi',
+  other: 'Diğer',
 };
-const CONTRACT_TYPE_ICONS: Record<ContractType, React.ReactNode> = {
-    customer_sale: <Users className="w-3.5 h-3.5" />,
-    contractor: <Hammer className="w-3.5 h-3.5" />,
-    supplier: <ShoppingBag className="w-3.5 h-3.5" />,
-    other: <FileSignature className="w-3.5 h-3.5" />,
-};
-const CONTRACT_TYPE_COLORS: Record<ContractType, string> = {
-    customer_sale: 'bg-green-100 text-green-700',
-    contractor: 'bg-orange-100 text-orange-700',
-    supplier: 'bg-blue-100 text-blue-700',
-    other: 'bg-slate-100 text-slate-600',
-};
-const CONTRACT_STATUS_COLORS: Record<ContractStatus, string> = {
-    draft: 'bg-slate-100 text-slate-500',
-    active: 'bg-blue-100 text-blue-700',
-    completed: 'bg-green-100 text-green-700',
-    cancelled: 'bg-red-100 text-red-600',
-};
+
 const CONTRACT_STATUS_LABELS: Record<ContractStatus, string> = {
-    draft: 'Taslak', active: 'Aktif', completed: 'Tamamlandı', cancelled: 'İptal',
+  draft: 'Taslak',
+  active: 'Aktif',
+  completed: 'Tamamlandı',
+  cancelled: 'İptal',
 };
+
+const INSTALLMENT_STATUS_LABELS: Record<InstallmentStatus, string> = {
+  pending: 'Bekliyor',
+  paid: 'Ödendi',
+  overdue: 'Gecikmiş',
+  cancelled: 'İptal',
+};
+
 const PAYMENT_TYPE_LABELS: Record<PaymentType, string> = {
-    cash: 'Nakit', bank: 'Banka', check: 'Çek', apartment: 'Daire', other: 'Diğer',
-};
-const PAYMENT_TYPE_ICONS: Record<PaymentType, React.ReactNode> = {
-    cash: <Wallet className="w-3 h-3" />,
-    bank: <Building2 className="w-3 h-3" />,
-    check: <FileSignature className="w-3 h-3" />,
-    apartment: <Home className="w-3 h-3" />,
-    other: <Circle className="w-3 h-3" />,
-};
-const INST_STATUS_COLORS: Record<InstallmentStatus, string> = {
-    pending: 'bg-amber-50 border-amber-200',
-    paid: 'bg-green-50 border-green-200',
-    overdue: 'bg-red-50 border-red-200',
-    cancelled: 'bg-slate-50 border-slate-200',
+  cash: 'Nakit',
+  bank: 'Banka',
+  check: 'Çek',
+  apartment: 'Daire',
+  other: 'Diğer',
 };
 
-const fmt = (n: number) => '₺' + new Intl.NumberFormat('tr-TR', { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(n || 0);
-const fmtDate = (d?: string) => d ? new Date(d).toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '—';
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function daysLabel(days: number | undefined) {
-    if (days === undefined) return '';
-    if (days < 0) return `${Math.abs(days)} gün GEÇTİ`;
-    if (days === 0) return 'Bugün';
-    return `${days} gün kaldı`;
-}
-function daysColor(days: number | undefined, status: InstallmentStatus) {
-    if (status === 'paid' || status === 'cancelled') return 'text-slate-400';
-    if (days === undefined) return '';
-    if (days < 0) return 'text-red-600 font-bold';
-    if (days <= 7) return 'text-orange-500 font-semibold';
-    if (days <= 30) return 'text-amber-600';
-    return 'text-slate-500';
+function fmt(amount: number) {
+  return new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY', maximumFractionDigits: 0 }).format(amount);
 }
 
-// ─── Pay Installment Modal ────────────────────────────────────────────────────
+function fmtDate(date?: string) {
+  if (!date) return '—';
+  return new Date(date).toLocaleDateString('tr-TR');
+}
 
-function PayModal({ installment, onClose, onPaid }: {
-    installment: Installment; onClose: () => void; onPaid: (updated: Installment) => void;
-}) {
-    const [amount, setAmount] = useState(String(installment.amount - installment.paid_amount));
-    const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
-    const [notes, setNotes] = useState('');
-    const [saving, setSaving] = useState(false);
+function daysUntil(date: string): number {
+  const diff = new Date(date).getTime() - new Date().setHours(0, 0, 0, 0);
+  return Math.ceil(diff / 86400000);
+}
 
-    const handlePay = async () => {
-        setSaving(true);
-        try {
-            const newPaid = installment.paid_amount + parseFloat(amount);
-            const isFullyPaid = newPaid >= installment.amount;
-            const res = await api.put(`/contracts/${installment.contract_id}/installments/${installment.id}`, {
-                paid_amount: newPaid,
-                paid_date: date,
-                status: isFullyPaid ? 'paid' : 'pending',
-                notes: notes || installment.notes,
-            });
-            toast.success(isFullyPaid ? 'Taksit ödendi ✓' : 'Kısmi ödeme kaydedildi');
-            onPaid(res.data.data);
-        } catch { toast.error('Hata'); }
-        finally { setSaving(false); }
-    };
+function contractTypeIcon(type: ContractType) {
+  const cls = 'w-4 h-4';
+  switch (type) {
+    case 'customer_sale': return <ArrowUpRight className={cls} />;
+    case 'contractor':    return <Hammer className={cls} />;
+    case 'supplier':      return <ShoppingBag className={cls} />;
+    default:              return <FileText className={cls} />;
+  }
+}
 
-    return ReactDOM.createPortal(
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 space-y-4" onClick={e => e.stopPropagation()}>
-                <div className="flex items-center justify-between">
-                    <h2 className="text-sm font-semibold text-slate-800">Ödeme Kaydet</h2>
-                    <button onClick={onClose}><X className="w-4 h-4 text-slate-400" /></button>
-                </div>
-                <div className="bg-slate-50 rounded-lg p-3 space-y-1">
-                    <p className="text-xs font-medium text-slate-700">{installment.description || `Taksit #${installment.installment_no}`}</p>
-                    <p className="text-xs text-slate-500">Toplam: {fmt(installment.amount)} · Ödenen: {fmt(installment.paid_amount)}</p>
-                    <p className="text-xs text-slate-500">Kalan: {fmt(installment.amount - installment.paid_amount)}</p>
-                </div>
-                <label className="flex flex-col gap-1">
-                    <span className="text-[10px] text-slate-400 uppercase font-semibold">Ödeme Tutarı</span>
-                    <input type="number" step="1" className="input-field" value={amount} onChange={e => setAmount(e.target.value)} />
-                </label>
-                <label className="flex flex-col gap-1">
-                    <span className="text-[10px] text-slate-400 uppercase font-semibold">Ödeme Tarihi</span>
-                    <input type="date" className="input-field" value={date} onChange={e => setDate(e.target.value)} />
-                </label>
-                <label className="flex flex-col gap-1">
-                    <span className="text-[10px] text-slate-400 uppercase font-semibold">Not</span>
-                    <input className="input-field" placeholder="İsteğe bağlı..." value={notes} onChange={e => setNotes(e.target.value)} />
-                </label>
-                <div className="flex gap-2">
-                    <button onClick={onClose} className="flex-1 py-2 text-xs border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50">İptal</button>
-                    <button onClick={handlePay} disabled={saving} className="flex-1 py-2 text-xs font-semibold bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50">
-                        {saving ? 'Kaydediliyor...' : 'Ödendi ✓'}
-                    </button>
-                </div>
+function statusPill(status: ContractStatus) {
+  const base = 'px-1.5 py-0.5 text-[11px] font-medium rounded-sm';
+  const map: Record<ContractStatus, string> = {
+    draft:     'bg-slate-100 text-slate-600',
+    active:    'bg-emerald-50 text-emerald-700',
+    completed: 'bg-blue-50 text-blue-700',
+    cancelled: 'bg-red-50 text-red-600',
+  };
+  return <span className={`${base} ${map[status]}`}>{CONTRACT_STATUS_LABELS[status]}</span>;
+}
+
+function installmentStatusIcon(status: InstallmentStatus) {
+  switch (status) {
+    case 'paid':     return <CheckCircle2 className="w-4 h-4 text-emerald-500" />;
+    case 'overdue':  return <AlertTriangle className="w-4 h-4 text-red-500" />;
+    case 'cancelled':return <X className="w-4 h-4 text-slate-400" />;
+    default:         return <Circle className="w-4 h-4 text-slate-300" />;
+  }
+}
+
+function documentUrl(contract: Contract): string | null {
+  if (!contract.document_path) return null;
+  const base = process.env.NEXT_PUBLIC_API_URL?.replace('/api', '') ?? '';
+  return `${base}/storage/${contract.document_path}`;
+}
+
+// ─── PayModal ─────────────────────────────────────────────────────────────────
+
+interface PayModalProps {
+  contractId: number;
+  installment: Installment;
+  onClose: () => void;
+  onSuccess: () => void;
+}
+
+function PayModal({ contractId, installment, onClose, onSuccess }: PayModalProps) {
+  const [paidAmount, setPaidAmount] = useState(String(installment.amount - installment.paid_amount));
+  const [paidDate, setPaidDate] = useState(new Date().toISOString().slice(0, 10));
+  const [notes, setNotes] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      const paid = parseFloat(paidAmount);
+      const newStatus = paid >= installment.amount ? 'paid' : 'pending';
+      await api.put(`/contracts/${contractId}/installments/${installment.id}`, {
+        paid_amount: paid,
+        paid_date: paidDate,
+        notes,
+        status: newStatus,
+      });
+      toast.success('Ödeme kaydedildi');
+      onSuccess();
+    } catch {
+      toast.error('Ödeme kaydedilemedi');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <ModalOverlay onClose={onClose}>
+      <div className="w-full max-w-md bg-white rounded-lg shadow-xl">
+        <ModalHeader title="Ödeme Kaydet" onClose={onClose} />
+        <form onSubmit={handleSubmit} className="p-5 space-y-4">
+          <div>
+            <label className="block text-xs text-slate-500 mb-1">Taksit</label>
+            <p className="text-sm text-slate-700 font-medium">#{installment.installment_no} — {fmt(installment.amount)}</p>
+          </div>
+          <FormField label="Ödenen Tutar (₺)">
+            <input
+              type="number" step="0.01" required
+              value={paidAmount}
+              onChange={e => setPaidAmount(e.target.value)}
+              className={inputCls}
+            />
+          </FormField>
+          <FormField label="Ödeme Tarihi">
+            <input
+              type="date" required
+              value={paidDate}
+              onChange={e => setPaidDate(e.target.value)}
+              className={inputCls}
+            />
+          </FormField>
+          <FormField label="Notlar">
+            <textarea
+              rows={2}
+              value={notes}
+              onChange={e => setNotes(e.target.value)}
+              className={inputCls}
+            />
+          </FormField>
+          <ModalFooter onClose={onClose} saving={saving} submitLabel="Ödemeyi Kaydet" />
+        </form>
+      </div>
+    </ModalOverlay>
+  );
+}
+
+// ─── InvoiceModal ─────────────────────────────────────────────────────────────
+
+interface InvoiceModalProps {
+  contractId: number;
+  installment: Installment;
+  accounts: AccountingAccount[];
+  onClose: () => void;
+  onSuccess: () => void;
+}
+
+function InvoiceModal({ contractId, installment, accounts, onClose, onSuccess }: InvoiceModalProps) {
+  const [form, setForm] = useState({
+    account_id: '',
+    invoice_no: '',
+    date: new Date().toISOString().slice(0, 10),
+    document_type: 'invoice',
+    description: '',
+  });
+  const [saving, setSaving] = useState(false);
+
+  function set(key: string, value: string) {
+    setForm(f => ({ ...f, [key]: value }));
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      await api.post(`/contracts/${contractId}/installments/${installment.id}/invoice`, {
+        ...form,
+        account_id: form.account_id ? parseInt(form.account_id) : undefined,
+      });
+      toast.success('Fatura oluşturuldu');
+      onSuccess();
+    } catch {
+      toast.error('Fatura oluşturulamadı');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <ModalOverlay onClose={onClose}>
+      <div className="w-full max-w-md bg-white rounded-lg shadow-xl">
+        <ModalHeader title="Faturalaştır" onClose={onClose} />
+        <form onSubmit={handleSubmit} className="p-5 space-y-4">
+          <FormField label="Hesap">
+            <select
+              value={form.account_id}
+              onChange={e => set('account_id', e.target.value)}
+              className={inputCls}
+            >
+              <option value="">Hesap seçin</option>
+              {accounts.map(a => (
+                <option key={a.id} value={String(a.id)}>
+                  {a.code ? `${a.code} — ` : ''}{a.name}
+                </option>
+              ))}
+            </select>
+          </FormField>
+          <FormField label="Fatura No">
+            <input
+              type="text"
+              value={form.invoice_no}
+              onChange={e => set('invoice_no', e.target.value)}
+              className={inputCls}
+            />
+          </FormField>
+          <FormField label="Tarih">
+            <input
+              type="date" required
+              value={form.date}
+              onChange={e => set('date', e.target.value)}
+              className={inputCls}
+            />
+          </FormField>
+          <FormField label="Belge Tipi">
+            <select
+              value={form.document_type}
+              onChange={e => set('document_type', e.target.value)}
+              className={inputCls}
+            >
+              <option value="invoice">Fatura</option>
+              <option value="receipt">Makbuz</option>
+              <option value="other">Diğer</option>
+            </select>
+          </FormField>
+          <FormField label="Açıklama">
+            <textarea
+              rows={2}
+              value={form.description}
+              onChange={e => set('description', e.target.value)}
+              className={inputCls}
+            />
+          </FormField>
+          <ModalFooter onClose={onClose} saving={saving} submitLabel="Fatura Oluştur" />
+        </form>
+      </div>
+    </ModalOverlay>
+  );
+}
+
+// ─── ContractFormModal ────────────────────────────────────────────────────────
+
+interface ContractFormModalProps {
+  contract?: Contract;
+  projectId: number;
+  onClose: () => void;
+  onSuccess: () => void;
+}
+
+function ContractFormModal({ contract, projectId, onClose, onSuccess }: ContractFormModalProps) {
+  const [form, setForm] = useState({
+    title: contract?.title ?? '',
+    type: (contract?.type ?? 'customer_sale') as ContractType,
+    status: (contract?.status ?? 'draft') as ContractStatus,
+    counterparty: contract?.counterparty ?? '',
+    total_value: contract ? String(contract.total_value) : '',
+    start_date: contract?.start_date ?? '',
+    end_date: contract?.end_date ?? '',
+    description: contract?.description ?? '',
+  });
+  const [saving, setSaving] = useState(false);
+
+  function set(key: string, value: string) {
+    setForm(f => ({ ...f, [key]: value }));
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      const payload = {
+        ...form,
+        total_value: parseFloat(form.total_value),
+        project_id: projectId,
+      };
+      if (contract) {
+        await api.put(`/contracts/${contract.id}`, payload);
+        toast.success('Sözleşme güncellendi');
+      } else {
+        await api.post('/contracts', payload);
+        toast.success('Sözleşme oluşturuldu');
+      }
+      onSuccess();
+    } catch {
+      toast.error('İşlem başarısız');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <ModalOverlay onClose={onClose}>
+      <div className="w-full max-w-lg bg-white rounded-lg shadow-xl">
+        <ModalHeader title={contract ? 'Sözleşme Düzenle' : 'Yeni Sözleşme'} onClose={onClose} />
+        <form onSubmit={handleSubmit} className="p-5 space-y-4">
+          <FormField label="Başlık *">
+            <input
+              required
+              value={form.title}
+              onChange={e => set('title', e.target.value)}
+              className={inputCls}
+              placeholder="Sözleşme başlığı"
+            />
+          </FormField>
+          <div className="grid grid-cols-2 gap-3">
+            <FormField label="Tip">
+              <select value={form.type} onChange={e => set('type', e.target.value)} className={inputCls}>
+                {(Object.keys(CONTRACT_TYPE_LABELS) as ContractType[]).map(t => (
+                  <option key={t} value={t}>{CONTRACT_TYPE_LABELS[t]}</option>
+                ))}
+              </select>
+            </FormField>
+            <FormField label="Durum">
+              <select value={form.status} onChange={e => set('status', e.target.value)} className={inputCls}>
+                {(Object.keys(CONTRACT_STATUS_LABELS) as ContractStatus[]).map(s => (
+                  <option key={s} value={s}>{CONTRACT_STATUS_LABELS[s]}</option>
+                ))}
+              </select>
+            </FormField>
+          </div>
+          <FormField label="Karşı Taraf">
+            <input
+              value={form.counterparty}
+              onChange={e => set('counterparty', e.target.value)}
+              className={inputCls}
+              placeholder="Şirket veya kişi adı"
+            />
+          </FormField>
+          <FormField label="Toplam Değer (₺) *">
+            <input
+              required type="number" step="0.01"
+              value={form.total_value}
+              onChange={e => set('total_value', e.target.value)}
+              className={inputCls}
+              placeholder="0.00"
+            />
+          </FormField>
+          <div className="grid grid-cols-2 gap-3">
+            <FormField label="Başlangıç Tarihi">
+              <input type="date" value={form.start_date} onChange={e => set('start_date', e.target.value)} className={inputCls} />
+            </FormField>
+            <FormField label="Bitiş Tarihi">
+              <input type="date" value={form.end_date} onChange={e => set('end_date', e.target.value)} className={inputCls} />
+            </FormField>
+          </div>
+          <FormField label="Açıklama">
+            <textarea rows={3} value={form.description} onChange={e => set('description', e.target.value)} className={inputCls} />
+          </FormField>
+          <ModalFooter onClose={onClose} saving={saving} submitLabel={contract ? 'Güncelle' : 'Oluştur'} />
+        </form>
+      </div>
+    </ModalOverlay>
+  );
+}
+
+// ─── AddInstallmentModal ──────────────────────────────────────────────────────
+
+interface AddInstallmentModalProps {
+  contractId: number;
+  nextNo: number;
+  onClose: () => void;
+  onSuccess: () => void;
+}
+
+function AddInstallmentModal({ contractId, nextNo, onClose, onSuccess }: AddInstallmentModalProps) {
+  const [form, setForm] = useState({
+    installment_no: String(nextNo),
+    description: '',
+    amount: '',
+    due_date: '',
+    payment_type: 'bank' as PaymentType,
+  });
+  const [saving, setSaving] = useState(false);
+
+  function set(key: string, value: string) {
+    setForm(f => ({ ...f, [key]: value }));
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      await api.post(`/contracts/${contractId}/installments`, {
+        ...form,
+        installment_no: parseInt(form.installment_no),
+        amount: parseFloat(form.amount),
+      });
+      toast.success('Taksit eklendi');
+      onSuccess();
+    } catch {
+      toast.error('Taksit eklenemedi');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <ModalOverlay onClose={onClose}>
+      <div className="w-full max-w-md bg-white rounded-lg shadow-xl">
+        <ModalHeader title="Taksit Ekle" onClose={onClose} />
+        <form onSubmit={handleSubmit} className="p-5 space-y-4">
+          <div className="grid grid-cols-2 gap-3">
+            <FormField label="Taksit No">
+              <input
+                type="number" required
+                value={form.installment_no}
+                onChange={e => set('installment_no', e.target.value)}
+                className={inputCls}
+              />
+            </FormField>
+            <FormField label="Ödeme Tipi">
+              <select value={form.payment_type} onChange={e => set('payment_type', e.target.value)} className={inputCls}>
+                {(Object.keys(PAYMENT_TYPE_LABELS) as PaymentType[]).map(t => (
+                  <option key={t} value={t}>{PAYMENT_TYPE_LABELS[t]}</option>
+                ))}
+              </select>
+            </FormField>
+          </div>
+          <FormField label="Açıklama">
+            <input
+              value={form.description}
+              onChange={e => set('description', e.target.value)}
+              className={inputCls}
+              placeholder="İsteğe bağlı"
+            />
+          </FormField>
+          <FormField label="Tutar (₺) *">
+            <input
+              required type="number" step="0.01"
+              value={form.amount}
+              onChange={e => set('amount', e.target.value)}
+              className={inputCls}
+            />
+          </FormField>
+          <FormField label="Vade Tarihi *">
+            <input
+              required type="date"
+              value={form.due_date}
+              onChange={e => set('due_date', e.target.value)}
+              className={inputCls}
+            />
+          </FormField>
+          <ModalFooter onClose={onClose} saving={saving} submitLabel="Taksit Ekle" />
+        </form>
+      </div>
+    </ModalOverlay>
+  );
+}
+
+// ─── Shared UI components ─────────────────────────────────────────────────────
+
+const inputCls = 'w-full border border-slate-200 rounded px-2.5 py-1.5 text-sm text-slate-800 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500';
+
+function ModalOverlay({ children, onClose }: { children: React.ReactNode; onClose: () => void }) {
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+      onClick={e => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      {children}
+    </div>
+  );
+}
+
+function ModalHeader({ title, onClose }: { title: string; onClose: () => void }) {
+  return (
+    <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-100">
+      <h2 className="text-sm font-semibold text-slate-900">{title}</h2>
+      <button type="button" onClick={onClose} className="text-slate-400 hover:text-slate-600">
+        <X className="w-4 h-4" />
+      </button>
+    </div>
+  );
+}
+
+function FormField({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <label className="block text-xs text-slate-500 mb-1">{label}</label>
+      {children}
+    </div>
+  );
+}
+
+function ModalFooter({ onClose, saving, submitLabel }: { onClose: () => void; saving: boolean; submitLabel: string }) {
+  return (
+    <div className="flex justify-end gap-2 pt-2">
+      <button type="button" onClick={onClose} className="px-3 py-1.5 text-sm text-slate-600 border border-slate-200 rounded hover:bg-slate-50">
+        İptal
+      </button>
+      <button
+        type="submit" disabled={saving}
+        className="px-3 py-1.5 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+      >
+        {saving ? 'Kaydediliyor...' : submitLabel}
+      </button>
+    </div>
+  );
+}
+
+// ─── DetailPanel ──────────────────────────────────────────────────────────────
+
+interface DetailPanelProps {
+  contract: Contract;
+  accounts: AccountingAccount[];
+  onEdit: () => void;
+  onDeleted: () => void;
+  onRefresh: () => void;
+  onBack?: () => void;
+}
+
+function DetailPanel({ contract, accounts, onEdit, onDeleted, onRefresh, onBack }: DetailPanelProps) {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+  const [payTarget, setPayTarget] = useState<Installment | null>(null);
+  const [invoiceTarget, setInvoiceTarget] = useState<Installment | null>(null);
+  const [addInstallment, setAddInstallment] = useState(false);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [statusSaving, setStatusSaving] = useState(false);
+
+  const paid = contract.paid_amount ?? 0;
+  const total = contract.total_value;
+  const paidPct = total > 0 ? Math.min(100, (paid / total) * 100) : 0;
+  const overdue = (contract.installments ?? []).filter(i => i.status === 'overdue');
+  const soonDue = (contract.installments ?? []).filter(i => i.status === 'pending' && daysUntil(i.due_date) <= 7 && daysUntil(i.due_date) >= 0);
+
+  async function handleStatusChange(status: string) {
+    setStatusSaving(true);
+    try {
+      await api.put(`/contracts/${contract.id}`, { status });
+      toast.success('Durum güncellendi');
+      onRefresh();
+    } catch {
+      toast.error('Durum güncellenemedi');
+    } finally {
+      setStatusSaving(false);
+    }
+  }
+
+  async function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append('document', file);
+      await api.post(`/contracts/${contract.id}/document`, fd);
+      toast.success('Belge yüklendi');
+      onRefresh();
+    } catch {
+      toast.error('Yükleme başarısız');
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  }
+
+  async function handleDeleteInstallment(id: number) {
+    if (!confirm('Bu taksiti silmek istediğinize emin misiniz?')) return;
+    setDeletingId(id);
+    try {
+      await api.delete(`/contracts/${contract.id}/installments/${id}`);
+      toast.success('Taksit silindi');
+      onRefresh();
+    } catch {
+      toast.error('Taksit silinemedi');
+    } finally {
+      setDeletingId(null);
+    }
+  }
+
+  async function handleDeleteContract() {
+    if (!confirm('Bu sözleşmeyi silmek istediğinize emin misiniz? Bu işlem geri alınamaz.')) return;
+    try {
+      await api.delete(`/contracts/${contract.id}`);
+      toast.success('Sözleşme silindi');
+      onDeleted();
+    } catch {
+      toast.error('Sözleşme silinemedi');
+    }
+  }
+
+  const nextNo = Math.max(0, ...(contract.installments ?? []).map(i => i.installment_no)) + 1;
+  const docUrl = documentUrl(contract);
+
+  return (
+    <div className="flex flex-col h-full overflow-hidden">
+      {/* Back button (mobile) */}
+      {onBack && (
+        <button onClick={onBack} className="flex items-center gap-1 px-4 py-2.5 text-sm text-slate-600 border-b border-slate-100 hover:bg-slate-50 md:hidden">
+          <ChevronLeft className="w-4 h-4" /> Listele Dön
+        </button>
+      )}
+
+      <div className="flex-1 overflow-y-auto p-5 space-y-5">
+        {/* Alert strip */}
+        {overdue.length > 0 && (
+          <div className="flex items-center gap-2 px-3 py-2 bg-red-50 border border-red-100 rounded text-sm text-red-700">
+            <AlertCircle className="w-4 h-4 flex-shrink-0" />
+            <span><strong>{overdue.length}</strong> gecikmiş taksit var.</span>
+          </div>
+        )}
+        {overdue.length === 0 && soonDue.length > 0 && (
+          <div className="flex items-center gap-2 px-3 py-2 bg-amber-50 border border-amber-100 rounded text-sm text-amber-700">
+            <Clock className="w-4 h-4 flex-shrink-0" />
+            <span><strong>{soonDue.length}</strong> taksit 7 gün içinde vadesi doluyor.</span>
+          </div>
+        )}
+
+        {/* Header */}
+        <div className="flex items-start justify-between gap-4">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 mb-1">
+              <span className="text-slate-400">{contractTypeIcon(contract.type)}</span>
+              <span className="text-xs text-slate-500">{CONTRACT_TYPE_LABELS[contract.type]}</span>
             </div>
-        </div>,
-        document.body
-    );
-}
-
-// ─── Installment Row ──────────────────────────────────────────────────────────
-
-function InstallmentRow({ inst, contractId, onUpdate, onDelete }: {
-    inst: Installment; contractId: number;
-    onUpdate: (updated: Installment) => void; onDelete: (id: number) => void;
-}) {
-    const [payOpen, setPayOpen] = useState(false);
-    const [menuOpen, setMenuOpen] = useState(false);
-    const today = new Date();
-    const due = new Date(inst.due_date);
-    const daysUntil = Math.round((due.getTime() - today.getTime()) / 86400000);
-
-    const handleStatusChange = async (status: InstallmentStatus) => {
-        try {
-            const res = await api.put(`/contracts/${contractId}/installments/${inst.id}`, { status });
-            onUpdate(res.data.data);
-            toast.success('Durum güncellendi');
-        } catch { toast.error('Hata'); }
-        setMenuOpen(false);
-    };
-
-    const handleDelete = async () => {
-        if (!confirm('Bu taksit silinecek. Emin misiniz?')) return;
-        try {
-            await api.delete(`/contracts/${contractId}/installments/${inst.id}`);
-            onDelete(inst.id);
-            toast.success('Taksit silindi');
-        } catch { toast.error('Silinemedi'); }
-    };
-
-    const paidPct = inst.amount > 0 ? Math.min((inst.paid_amount / inst.amount) * 100, 100) : 0;
-
-    return (
-        <div className={`border rounded-xl p-3 ${INST_STATUS_COLORS[inst.status]}`}>
-            <div className="flex items-start gap-3">
-                {/* Status icon */}
-                <div className="mt-0.5 shrink-0">
-                    {inst.status === 'paid' && <CheckCircle2 className="w-4 h-4 text-green-600" />}
-                    {inst.status === 'overdue' && <AlertTriangle className="w-4 h-4 text-red-500" />}
-                    {inst.status === 'pending' && <Clock className="w-4 h-4 text-amber-500" />}
-                    {inst.status === 'cancelled' && <X className="w-4 h-4 text-slate-400" />}
-                </div>
-
-                <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-xs font-semibold text-slate-800">
-                            {inst.description || `Taksit #${inst.installment_no}`}
-                        </span>
-                        <span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full bg-white/70 border border-slate-200 text-slate-500">
-                            {PAYMENT_TYPE_ICONS[inst.payment_type]} {PAYMENT_TYPE_LABELS[inst.payment_type]}
-                        </span>
-                    </div>
-                    <div className="flex items-center gap-3 mt-1 flex-wrap">
-                        <span className="text-xs font-mono font-bold text-slate-800">{fmt(inst.amount)}</span>
-                        <span className="text-[10px] text-slate-500">Vade: {fmtDate(inst.due_date)}</span>
-                        {inst.status !== 'paid' && inst.status !== 'cancelled' && (
-                            <span className={`text-[10px] ${daysColor(daysUntil, inst.status)}`}>
-                                {daysLabel(daysUntil)}
-                            </span>
-                        )}
-                        {inst.status === 'paid' && inst.paid_date && (
-                            <span className="text-[10px] text-green-600">Ödendi: {fmtDate(inst.paid_date)}</span>
-                        )}
-                    </div>
-                    {/* Progress bar for partial payments */}
-                    {inst.paid_amount > 0 && inst.status !== 'paid' && (
-                        <div className="mt-1.5 space-y-0.5">
-                            <div className="h-1 bg-white/80 rounded-full overflow-hidden">
-                                <div className="h-full bg-green-500 rounded-full" style={{ width: `${paidPct}%` }} />
-                            </div>
-                            <span className="text-[9px] text-green-600">{fmt(inst.paid_amount)} ödendi, {fmt(inst.amount - inst.paid_amount)} kaldı</span>
-                        </div>
-                    )}
-                </div>
-
-                {/* Actions */}
-                <div className="flex items-center gap-1 shrink-0">
-                    {inst.status !== 'paid' && inst.status !== 'cancelled' && (
-                        <button
-                            onClick={() => setPayOpen(true)}
-                            className="px-2 py-1 text-[10px] font-semibold bg-green-600 text-white rounded-lg hover:bg-green-700"
-                        >
-                            Öde
-                        </button>
-                    )}
-                    <div className="relative">
-                        <button
-                            onClick={() => setMenuOpen(o => !o)}
-                            className="p-1 rounded hover:bg-white/60 text-slate-400"
-                        >
-                            <MoreVertical className="w-3.5 h-3.5" />
-                        </button>
-                        {menuOpen && ReactDOM.createPortal(
-                            <>
-                                <div className="fixed inset-0 z-40" onClick={() => setMenuOpen(false)} />
-                                <div className="fixed z-50 bg-white rounded-xl border border-slate-200 shadow-xl py-1 w-40" style={{ top: 0, left: 0 }} ref={el => {
-                                    if (el) {
-                                        const btn = el.previousElementSibling as HTMLElement;
-                                        if (btn) {
-                                            const rect = btn.getBoundingClientRect();
-                                            el.style.top = `${rect.bottom + 4}px`;
-                                            el.style.left = `${rect.right - 160}px`;
-                                        }
-                                    }
-                                }}>
-                                    {inst.status !== 'paid' && <button onClick={() => handleStatusChange('paid')} className="w-full px-3 py-1.5 text-xs text-left text-green-700 hover:bg-green-50 flex items-center gap-2"><CheckCircle2 className="w-3 h-3" />Ödendi işaretle</button>}
-                                    {inst.status !== 'pending' && <button onClick={() => handleStatusChange('pending')} className="w-full px-3 py-1.5 text-xs text-left text-amber-700 hover:bg-amber-50 flex items-center gap-2"><Clock className="w-3 h-3" />Beklemede</button>}
-                                    {inst.status !== 'cancelled' && <button onClick={() => handleStatusChange('cancelled')} className="w-full px-3 py-1.5 text-xs text-left text-slate-600 hover:bg-slate-50 flex items-center gap-2"><X className="w-3 h-3" />İptal et</button>}
-                                    <div className="border-t border-slate-100 my-0.5" />
-                                    <button onClick={handleDelete} className="w-full px-3 py-1.5 text-xs text-left text-red-600 hover:bg-red-50 flex items-center gap-2"><Trash2 className="w-3 h-3" />Sil</button>
-                                </div>
-                            </>,
-                            document.body
-                        )}
-                    </div>
-                </div>
-            </div>
-
-            {payOpen && (
-                <PayModal
-                    installment={inst}
-                    onClose={() => setPayOpen(false)}
-                    onPaid={updated => { onUpdate(updated); setPayOpen(false); }}
-                />
+            <h2 className="text-base font-semibold text-slate-900 leading-tight">{contract.title}</h2>
+            {contract.counterparty && (
+              <p className="text-sm text-slate-500 mt-0.5">{contract.counterparty}</p>
             )}
+          </div>
+          <div className="flex items-center gap-1.5 flex-shrink-0">
+            <select
+              value={contract.status}
+              disabled={statusSaving}
+              onChange={e => handleStatusChange(e.target.value)}
+              className="text-xs border border-slate-200 rounded px-2 py-1 text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            >
+              {(Object.keys(CONTRACT_STATUS_LABELS) as ContractStatus[]).map(s => (
+                <option key={s} value={s}>{CONTRACT_STATUS_LABELS[s]}</option>
+              ))}
+            </select>
+            <button onClick={onEdit} className="p-1.5 text-slate-400 hover:text-slate-700 border border-slate-200 rounded hover:bg-slate-50">
+              <Edit2 className="w-3.5 h-3.5" />
+            </button>
+            <button onClick={handleDeleteContract} className="p-1.5 text-slate-400 hover:text-red-500 border border-slate-200 rounded hover:bg-red-50">
+              <Trash2 className="w-3.5 h-3.5" />
+            </button>
+          </div>
         </div>
-    );
-}
 
-// ─── Add Installment Form ─────────────────────────────────────────────────────
-
-const EMPTY_INST = {
-    description: '', amount: '', due_date: '', payment_type: 'cash' as PaymentType,
-    notes: '', status: 'pending' as InstallmentStatus,
-};
-
-function AddInstallmentForm({ contractId, projectId, onAdded, onCancel, nextNo }: {
-    contractId: number; projectId: number; onAdded: (i: Installment) => void;
-    onCancel: () => void; nextNo: number;
-}) {
-    const [form, setForm] = useState(EMPTY_INST);
-    const [saving, setSaving] = useState(false);
-    const set = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }));
-
-    const handleSubmit = async () => {
-        if (!form.amount || !form.due_date) { toast.error('Tutar ve vade tarihi zorunlu'); return; }
-        setSaving(true);
-        try {
-            const res = await api.post(`/contracts/${contractId}/installments`, {
-                ...form, amount: parseFloat(form.amount), installment_no: nextNo,
-            });
-            onAdded(res.data.data);
-            toast.success('Taksit eklendi');
-        } catch (err: any) {
-            toast.error(err?.response?.data?.message || 'Hata');
-        } finally { setSaving(false); }
-    };
-
-    return (
-        <div className="border border-dashed border-blue-300 rounded-xl p-3 bg-blue-50/50 space-y-3">
-            <p className="text-[10px] font-bold text-blue-600 uppercase tracking-wide">Yeni Taksit / Ödeme Kalemi</p>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                <input className="input-field col-span-2" placeholder="Açıklama (örn: 1. Taksit, Daire #12)" value={form.description} onChange={e => set('description', e.target.value)} />
-                <input type="number" className="input-field" placeholder="Tutar" value={form.amount} onChange={e => set('amount', e.target.value)} />
-                <input type="date" className="input-field" value={form.due_date} onChange={e => set('due_date', e.target.value)} />
-                <select className="input-field" value={form.payment_type} onChange={e => set('payment_type', e.target.value)}>
-                    {Object.entries(PAYMENT_TYPE_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-                </select>
-                <input className="input-field col-span-2 sm:col-span-3" placeholder="Not (isteğe bağlı)" value={form.notes} onChange={e => set('notes', e.target.value)} />
-            </div>
-            <div className="flex gap-2">
-                <button onClick={onCancel} className="px-3 py-1.5 text-xs border border-slate-200 rounded-lg text-slate-600 hover:bg-white">İptal</button>
-                <button onClick={handleSubmit} disabled={saving} className="px-3 py-1.5 text-xs font-semibold bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50">
-                    {saving ? '...' : 'Ekle'}
-                </button>
-            </div>
+        {/* Meta row */}
+        <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm">
+          <MetaItem label="Başlangıç" value={fmtDate(contract.start_date)} />
+          <MetaItem label="Bitiş" value={fmtDate(contract.end_date)} />
+          <MetaItem label="Toplam Değer" value={fmt(contract.total_value)} />
+          <MetaItem label="Kalan" value={fmt(contract.remaining_amount ?? (contract.total_value - paid))} />
         </div>
-    );
-}
 
-// ─── Contract Card ────────────────────────────────────────────────────────────
+        {/* Progress */}
+        <div>
+          <div className="flex justify-between text-xs text-slate-500 mb-1">
+            <span>Ödeme İlerlemesi</span>
+            <span>{fmt(paid)} / {fmt(total)}</span>
+          </div>
+          <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+            <div
+              className="h-full bg-blue-500 rounded-full transition-all"
+              style={{ width: `${paidPct}%` }}
+            />
+          </div>
+        </div>
 
-function ContractCard({ contract, onUpdate, onDelete }: {
-    contract: Contract; onUpdate: (c: Contract) => void; onDelete: (id: number) => void;
-}) {
-    const [expanded, setExpanded] = useState(false);
-    const [addingInst, setAddingInst] = useState(false);
-    const [editOpen, setEditOpen] = useState(false);
+        {/* Document */}
+        <div>
+          <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-2">Belge</p>
+          <input ref={fileInputRef} type="file" className="hidden" onChange={handleUpload} accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" />
+          {docUrl ? (
+            <div className="flex items-center gap-2 px-3 py-2 border border-slate-200 rounded bg-slate-50 text-sm">
+              <FileCheck className="w-4 h-4 text-slate-400 flex-shrink-0" />
+              <span className="truncate text-slate-700 flex-1">{contract.document_name ?? contract.document_path}</span>
+              <a
+                href={docUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1 text-blue-600 hover:text-blue-800 text-xs font-medium flex-shrink-0"
+              >
+                <Download className="w-3.5 h-3.5" /> İndir
+              </a>
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className="text-slate-400 hover:text-slate-600 text-xs flex-shrink-0"
+                disabled={uploading}
+              >
+                Değiştir
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploading}
+              className="flex items-center gap-2 px-3 py-2 border border-dashed border-slate-300 rounded text-sm text-slate-500 hover:bg-slate-50 hover:border-slate-400 disabled:opacity-50"
+            >
+              <Upload className="w-4 h-4" />
+              {uploading ? 'Yükleniyor...' : 'Belge Yükle'}
+            </button>
+          )}
+        </div>
 
-    const installments = contract.installments || [];
-    const paidCount = installments.filter(i => i.status === 'paid').length;
-    const overdueCount = installments.filter(i => i.status === 'overdue' || (i.status === 'pending' && new Date(i.due_date) < new Date())).length;
-    const totalPaid = installments.reduce((s, i) => s + i.paid_amount, 0);
-    const progress = contract.total_value > 0 ? Math.min((totalPaid / contract.total_value) * 100, 100) : 0;
+        {/* Installments */}
+        <div>
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Taksitler</p>
+            <button
+              onClick={() => setAddInstallment(true)}
+              className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 font-medium"
+            >
+              <Plus className="w-3.5 h-3.5" /> Taksit Ekle
+            </button>
+          </div>
 
-    const handleInstUpdate = (updated: Installment) => {
-        const newInsts = installments.map(i => i.id === updated.id ? updated : i);
-        onUpdate({ ...contract, installments: newInsts });
-    };
-    const handleInstDelete = (id: number) => {
-        onUpdate({ ...contract, installments: installments.filter(i => i.id !== id) });
-    };
-    const handleInstAdded = (inst: Installment) => {
-        onUpdate({ ...contract, installments: [...installments, inst] });
-        setAddingInst(false);
-    };
-
-    const handleDelete = async () => {
-        if (!confirm(`"${contract.title}" sözleşmesi ve tüm taksitleri silinecek. Emin misiniz?`)) return;
-        try {
-            await api.delete(`/contracts/${contract.id}`);
-            onDelete(contract.id);
-            toast.success('Sözleşme silindi');
-        } catch { toast.error('Silinemedi'); }
-    };
-
-    return (
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-            {/* Header */}
-            <div className="p-4">
-                <div className="flex items-start gap-3">
-                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${CONTRACT_TYPE_COLORS[contract.type]}`}>
-                        {CONTRACT_TYPE_ICONS[contract.type]}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                            <h3 className="text-sm font-semibold text-slate-800 truncate">{contract.title}</h3>
-                            <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-semibold ${CONTRACT_STATUS_COLORS[contract.status]}`}>
-                                {CONTRACT_STATUS_LABELS[contract.status]}
+          {(!contract.installments || contract.installments.length === 0) ? (
+            <p className="text-sm text-slate-400 py-4 text-center">Henüz taksit yok.</p>
+          ) : (
+            <div className="overflow-x-auto -mx-5">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="border-y border-slate-100 bg-slate-50">
+                    <th className="pl-5 py-2 text-left font-medium text-slate-500 w-8">No</th>
+                    <th className="px-2 py-2 text-left font-medium text-slate-500">Açıklama</th>
+                    <th className="px-2 py-2 text-right font-medium text-slate-500">Tutar</th>
+                    <th className="px-2 py-2 text-left font-medium text-slate-500">Vade</th>
+                    <th className="px-2 py-2 text-left font-medium text-slate-500">Tip</th>
+                    <th className="px-2 py-2 text-center font-medium text-slate-500">Durum</th>
+                    <th className="px-2 py-2 text-right font-medium text-slate-500">Kalan Gün</th>
+                    <th className="pr-5 py-2 text-right font-medium text-slate-500">İşlem</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-50">
+                  {contract.installments.map(inst => {
+                    const days = daysUntil(inst.due_date);
+                    const isPending = inst.status === 'pending';
+                    return (
+                      <tr key={inst.id} className="hover:bg-slate-50/60">
+                        <td className="pl-5 py-2 text-slate-500">{inst.installment_no}</td>
+                        <td className="px-2 py-2 text-slate-700 max-w-[100px] truncate">{inst.description || '—'}</td>
+                        <td className="px-2 py-2 text-right text-slate-800 font-medium tabular-nums">{fmt(inst.amount)}</td>
+                        <td className="px-2 py-2 text-slate-600 whitespace-nowrap">{fmtDate(inst.due_date)}</td>
+                        <td className="px-2 py-2 text-slate-500">{PAYMENT_TYPE_LABELS[inst.payment_type]}</td>
+                        <td className="px-2 py-2 text-center">
+                          <span className="inline-flex items-center gap-1">
+                            {installmentStatusIcon(inst.status)}
+                          </span>
+                        </td>
+                        <td className="px-2 py-2 text-right tabular-nums">
+                          {inst.status === 'paid' ? (
+                            <span className="text-slate-300">—</span>
+                          ) : (
+                            <span className={days < 0 ? 'text-red-600 font-medium' : days <= 7 ? 'text-amber-600 font-medium' : 'text-slate-500'}>
+                              {days < 0 ? `${Math.abs(days)}g geç` : `${days}g`}
                             </span>
-                            {overdueCount > 0 && (
-                                <span className="text-[10px] px-1.5 py-0.5 rounded-full font-semibold bg-red-100 text-red-700 flex items-center gap-0.5">
-                                    <AlertTriangle className="w-2.5 h-2.5" /> {overdueCount} vadesi geçmiş
-                                </span>
+                          )}
+                        </td>
+                        <td className="pr-5 py-2">
+                          <div className="flex items-center justify-end gap-1">
+                            {isPending && (
+                              <>
+                                <button
+                                  title="Öde"
+                                  onClick={() => setPayTarget(inst)}
+                                  className="p-1 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded"
+                                >
+                                  <CreditCard className="w-3.5 h-3.5" />
+                                </button>
+                                <button
+                                  title="Faturalaştır"
+                                  onClick={() => setInvoiceTarget(inst)}
+                                  className="p-1 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded"
+                                >
+                                  <Receipt className="w-3.5 h-3.5" />
+                                </button>
+                              </>
                             )}
-                        </div>
-                        {contract.counterparty && (
-                            <p className="text-xs text-slate-500 mt-0.5">{contract.counterparty}</p>
-                        )}
-                        <div className="flex items-center gap-3 mt-2 flex-wrap">
-                            <span className="text-sm font-bold font-mono text-slate-800">{fmt(contract.total_value)}</span>
-                            <span className="text-xs text-slate-400">{paidCount}/{installments.length} taksit ödendi</span>
-                            {contract.end_date && <span className="text-xs text-slate-400">Bitiş: {fmtDate(contract.end_date)}</span>}
-                        </div>
-                        {/* Progress bar */}
-                        <div className="mt-2 space-y-1">
-                            <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                                <div className={`h-full rounded-full transition-all ${progress >= 100 ? 'bg-green-500' : 'bg-blue-500'}`} style={{ width: `${progress}%` }} />
-                            </div>
-                            <div className="flex justify-between text-[9px] text-slate-400">
-                                <span>Ödenen: {fmt(totalPaid)}</span>
-                                <span>Kalan: {fmt(Math.max(0, contract.total_value - totalPaid))}</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Actions */}
-                    <div className="flex items-center gap-1 shrink-0">
-                        <button onClick={() => setEditOpen(true)} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400">
-                            <Edit2 className="w-3.5 h-3.5" />
-                        </button>
-                        <button onClick={handleDelete} className="p-1.5 rounded-lg hover:bg-red-50 text-slate-400 hover:text-red-500">
-                            <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                        <button onClick={() => setExpanded(o => !o)} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400">
-                            {expanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                        </button>
-                    </div>
-                </div>
+                            <button
+                              title="Sil"
+                              onClick={() => handleDeleteInstallment(inst.id)}
+                              disabled={deletingId === inst.id}
+                              className="p-1 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded disabled:opacity-40"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
-
-            {/* Installments panel */}
-            {expanded && (
-                <div className="border-t border-slate-100 p-4 space-y-2 bg-slate-50/50">
-                    {installments.length === 0 && !addingInst && (
-                        <p className="text-xs text-slate-400 text-center py-2">Henüz taksit eklenmemiş</p>
-                    )}
-                    {installments.map(inst => (
-                        <InstallmentRow
-                            key={inst.id}
-                            inst={inst}
-                            contractId={contract.id}
-                            onUpdate={handleInstUpdate}
-                            onDelete={handleInstDelete}
-                        />
-                    ))}
-                    {addingInst ? (
-                        <AddInstallmentForm
-                            contractId={contract.id}
-                            projectId={contract.id}
-                            onAdded={handleInstAdded}
-                            onCancel={() => setAddingInst(false)}
-                            nextNo={installments.length + 1}
-                        />
-                    ) : (
-                        <button
-                            onClick={() => setAddingInst(true)}
-                            className="w-full py-2 text-xs text-blue-600 border border-dashed border-blue-300 rounded-xl hover:bg-blue-50 flex items-center justify-center gap-1"
-                        >
-                            <Plus className="w-3.5 h-3.5" /> Taksit / Ödeme Kalemi Ekle
-                        </button>
-                    )}
-                </div>
-            )}
-
-            {editOpen && (
-                <ContractFormModal
-                    contract={contract}
-                    onClose={() => setEditOpen(false)}
-                    onSaved={c => { onUpdate(c); setEditOpen(false); }}
-                />
-            )}
+          )}
         </div>
-    );
+
+        {/* Description */}
+        {contract.description && (
+          <div>
+            <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Açıklama</p>
+            <p className="text-sm text-slate-700 whitespace-pre-wrap">{contract.description}</p>
+          </div>
+        )}
+      </div>
+
+      {/* Modals */}
+      {payTarget && (
+        <PayModal
+          contractId={contract.id}
+          installment={payTarget}
+          onClose={() => setPayTarget(null)}
+          onSuccess={() => { setPayTarget(null); onRefresh(); }}
+        />
+      )}
+      {invoiceTarget && (
+        <InvoiceModal
+          contractId={contract.id}
+          installment={invoiceTarget}
+          accounts={accounts}
+          onClose={() => setInvoiceTarget(null)}
+          onSuccess={() => { setInvoiceTarget(null); onRefresh(); }}
+        />
+      )}
+      {addInstallment && (
+        <AddInstallmentModal
+          contractId={contract.id}
+          nextNo={nextNo}
+          onClose={() => setAddInstallment(false)}
+          onSuccess={() => { setAddInstallment(false); onRefresh(); }}
+        />
+      )}
+    </div>
+  );
 }
 
-// ─── Contract Form Modal ──────────────────────────────────────────────────────
-
-const EMPTY_CONTRACT_FORM = {
-    type: 'contractor' as ContractType,
-    title: '', counterparty: '', total_value: '',
-    start_date: '', end_date: '', status: 'active' as ContractStatus, description: '',
-};
-
-function ContractFormModal({ contract, onClose, onSaved }: {
-    contract?: Contract; onClose: () => void; onSaved: (c: Contract) => void;
-}) {
-    const { activeProject } = useProjectStore();
-    const [form, setForm] = useState(contract ? {
-        type: contract.type, title: contract.title,
-        counterparty: contract.counterparty || '', total_value: String(contract.total_value),
-        start_date: contract.start_date || '', end_date: contract.end_date || '',
-        status: contract.status, description: contract.description || '',
-    } : EMPTY_CONTRACT_FORM);
-    const [saving, setSaving] = useState(false);
-    const set = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }));
-
-    const handleSubmit = async (e: React.SyntheticEvent) => {
-        e.preventDefault();
-        if (!form.title) { toast.error('Başlık zorunlu'); return; }
-        setSaving(true);
-        try {
-            const payload = {
-                ...form, total_value: parseFloat(form.total_value) || 0,
-                active_project_id: activeProject!.id,
-            };
-            let saved: Contract;
-            if (contract) {
-                const res = await api.put(`/contracts/${contract.id}`, payload);
-                saved = res.data.data;
-            } else {
-                const res = await api.post('/contracts', payload);
-                saved = { ...res.data.data, installments: [] };
-            }
-            toast.success(contract ? 'Sözleşme güncellendi' : 'Sözleşme oluşturuldu');
-            onSaved(saved);
-        } catch (err: any) {
-            toast.error(err?.response?.data?.message || 'Hata');
-        } finally { setSaving(false); }
-    };
-
-    return ReactDOM.createPortal(
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
-            <form className="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6 space-y-4" onClick={e => e.stopPropagation()} onSubmit={handleSubmit}>
-                <div className="flex items-center justify-between">
-                    <h2 className="text-sm font-semibold text-slate-800">{contract ? 'Sözleşmeyi Düzenle' : 'Yeni Sözleşme'}</h2>
-                    <button type="button" onClick={onClose}><X className="w-4 h-4 text-slate-400" /></button>
-                </div>
-
-                {/* Type buttons */}
-                <div className="grid grid-cols-4 gap-1.5">
-                    {(Object.keys(CONTRACT_TYPE_LABELS) as ContractType[]).map(t => (
-                        <button key={t} type="button"
-                            onClick={() => set('type', t)}
-                            className={`py-2 px-1 rounded-lg text-[10px] font-semibold border transition-colors ${form.type === t ? CONTRACT_TYPE_COLORS[t] + ' border-transparent' : 'border-slate-200 text-slate-500 hover:bg-slate-50'}`}
-                        >
-                            <div className="flex justify-center mb-0.5">{CONTRACT_TYPE_ICONS[t]}</div>
-                            {CONTRACT_TYPE_LABELS[t]}
-                        </button>
-                    ))}
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                    <label className="col-span-2 flex flex-col gap-1">
-                        <span className="text-[10px] text-slate-400 uppercase font-semibold">Başlık *</span>
-                        <input required className="input-field" placeholder="örn: Kaba İnşaat Taşeron Sözleşmesi" value={form.title} onChange={e => set('title', e.target.value)} />
-                    </label>
-                    <label className="col-span-2 flex flex-col gap-1">
-                        <span className="text-[10px] text-slate-400 uppercase font-semibold">
-                            {form.type === 'customer_sale' ? 'Müşteri Adı' : form.type === 'contractor' ? 'Taşeron Adı' : form.type === 'supplier' ? 'Tedarikçi Adı' : 'İlgili Taraf'}
-                        </span>
-                        <input className="input-field" placeholder="Ad / Firma" value={form.counterparty} onChange={e => set('counterparty', e.target.value)} />
-                    </label>
-                    <label className="flex flex-col gap-1">
-                        <span className="text-[10px] text-slate-400 uppercase font-semibold">Toplam Bedel (TL)</span>
-                        <input type="number" step="1" className="input-field" placeholder="0" value={form.total_value} onChange={e => set('total_value', e.target.value)} />
-                    </label>
-                    <label className="flex flex-col gap-1">
-                        <span className="text-[10px] text-slate-400 uppercase font-semibold">Durum</span>
-                        <select className="input-field" value={form.status} onChange={e => set('status', e.target.value)}>
-                            {Object.entries(CONTRACT_STATUS_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-                        </select>
-                    </label>
-                    <label className="flex flex-col gap-1">
-                        <span className="text-[10px] text-slate-400 uppercase font-semibold">Başlangıç Tarihi</span>
-                        <input type="date" className="input-field" value={form.start_date} onChange={e => set('start_date', e.target.value)} />
-                    </label>
-                    <label className="flex flex-col gap-1">
-                        <span className="text-[10px] text-slate-400 uppercase font-semibold">Bitiş / Teslim Tarihi</span>
-                        <input type="date" className="input-field" value={form.end_date} onChange={e => set('end_date', e.target.value)} />
-                    </label>
-                    <label className="col-span-2 flex flex-col gap-1">
-                        <span className="text-[10px] text-slate-400 uppercase font-semibold">Açıklama / Notlar</span>
-                        <textarea rows={2} className="input-field resize-none" placeholder="Sözleşme detayları..." value={form.description} onChange={e => set('description', e.target.value)} />
-                    </label>
-                </div>
-
-                <div className="flex gap-2">
-                    <button type="button" onClick={onClose} className="flex-1 py-2 text-xs border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50">İptal</button>
-                    <button type="submit" disabled={saving} className="flex-1 py-2 text-xs font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50">
-                        {saving ? 'Kaydediliyor...' : (contract ? 'Güncelle' : 'Oluştur')}
-                    </button>
-                </div>
-            </form>
-        </div>,
-        document.body
-    );
+function MetaItem({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <p className="text-xs text-slate-500">{label}</p>
+      <p className="text-sm text-slate-800 font-medium">{value}</p>
+    </div>
+  );
 }
 
-// ─── Alert Banner ─────────────────────────────────────────────────────────────
+// ─── KPI Tile ─────────────────────────────────────────────────────────────────
 
-function AlertBanner({ contracts }: { contracts: Contract[] }) {
-    const today = new Date();
-    const in7 = new Date(today.getTime() + 7 * 86400000);
+function KpiTile({ label, value, sub, icon }: { label: string; value: string; sub?: string; icon: React.ReactNode }) {
+  return (
+    <div className="flex items-center gap-3 px-4 py-3 bg-white border border-slate-200 rounded">
+      <div className="text-slate-400">{icon}</div>
+      <div className="min-w-0">
+        <p className="text-xs text-slate-500 truncate">{label}</p>
+        <p className="text-sm font-semibold text-slate-900 tabular-nums truncate">{value}</p>
+        {sub && <p className="text-xs text-slate-400 truncate">{sub}</p>}
+      </div>
+    </div>
+  );
+}
 
-    const alerts = contracts.flatMap(c =>
-        (c.installments || [])
-            .filter(i => i.status === 'pending' || i.status === 'overdue')
-            .map(i => ({
-                ...i,
-                contractTitle: c.title,
-                contractCounterparty: c.counterparty,
-                daysUntil: Math.round((new Date(i.due_date).getTime() - today.getTime()) / 86400000),
-            }))
-    ).sort((a, b) => a.daysUntil - b.daysUntil);
+// ─── ContractRow ──────────────────────────────────────────────────────────────
 
-    const overdue = alerts.filter(a => a.daysUntil < 0);
-    const soon = alerts.filter(a => a.daysUntil >= 0 && new Date(a.due_date) <= in7);
-
-    if (overdue.length === 0 && soon.length === 0) return null;
-
-    return (
-        <div className="space-y-2">
-            {overdue.length > 0 && (
-                <div className="bg-red-50 border border-red-200 rounded-xl p-4">
-                    <div className="flex items-center gap-2 mb-3">
-                        <AlertTriangle className="w-4 h-4 text-red-500 shrink-0" />
-                        <h3 className="text-sm font-semibold text-red-700">{overdue.length} Taksit Vadesi Geçmiş!</h3>
-                    </div>
-                    <div className="space-y-2">
-                        {overdue.slice(0, 3).map(a => (
-                            <div key={a.id} className="flex items-center gap-3 bg-white rounded-lg p-2.5 border border-red-100">
-                                <div className="flex-1 min-w-0">
-                                    <p className="text-xs font-medium text-slate-800 truncate">{a.contractTitle} · {a.description || `Taksit #${a.installment_no}`}</p>
-                                    <p className="text-[10px] text-slate-500">{a.contractCounterparty} · Vade: {fmtDate(a.due_date)}</p>
-                                </div>
-                                <div className="text-right shrink-0">
-                                    <p className="text-xs font-mono font-bold text-red-700">{fmt(a.amount)}</p>
-                                    <p className="text-[10px] text-red-500">{Math.abs(a.daysUntil)} gün geçti</p>
-                                </div>
-                            </div>
-                        ))}
-                        {overdue.length > 3 && <p className="text-[10px] text-red-500 pl-1">+{overdue.length - 3} daha...</p>}
-                    </div>
-                </div>
-            )}
-            {soon.length > 0 && (
-                <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
-                    <div className="flex items-center gap-2 mb-3">
-                        <Clock className="w-4 h-4 text-amber-500 shrink-0" />
-                        <h3 className="text-sm font-semibold text-amber-700">7 Gün İçinde {soon.length} Taksit Vadesi Dolacak</h3>
-                    </div>
-                    <div className="space-y-2">
-                        {soon.map(a => (
-                            <div key={a.id} className="flex items-center gap-3 bg-white rounded-lg p-2.5 border border-amber-100">
-                                <div className="flex-1 min-w-0">
-                                    <p className="text-xs font-medium text-slate-800 truncate">{a.contractTitle} · {a.description || `Taksit #${a.installment_no}`}</p>
-                                    <p className="text-[10px] text-slate-500">{a.contractCounterparty} · Vade: {fmtDate(a.due_date)}</p>
-                                </div>
-                                <div className="text-right shrink-0">
-                                    <p className="text-xs font-mono font-bold text-amber-700">{fmt(a.amount)}</p>
-                                    <p className="text-[10px] text-amber-600">{a.daysUntil === 0 ? 'Bugün' : `${a.daysUntil} gün kaldı`}</p>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            )}
+function ContractRow({ contract, selected, onClick }: { contract: Contract; selected: boolean; onClick: () => void }) {
+  return (
+    <li
+      onClick={onClick}
+      className={`relative flex flex-col gap-0.5 px-4 py-3 cursor-pointer hover:bg-slate-50 border-b border-slate-100 transition-colors ${selected ? 'bg-blue-50/60' : ''}`}
+    >
+      {selected && <span className="absolute left-0 top-0 bottom-0 w-0.5 bg-blue-500 rounded-r" />}
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="text-slate-400 flex-shrink-0">{contractTypeIcon(contract.type)}</span>
+          <span className="text-sm font-medium text-slate-900 truncate">{contract.title}</span>
         </div>
-    );
+        <div className="flex items-center gap-1.5 flex-shrink-0">
+          {(contract.overdue_count ?? 0) > 0 && (
+            <span className="flex items-center gap-0.5 px-1.5 py-0.5 bg-red-50 text-red-600 text-[10px] font-semibold rounded-sm">
+              <AlertTriangle className="w-3 h-3" /> {contract.overdue_count}
+            </span>
+          )}
+          {statusPill(contract.status)}
+        </div>
+      </div>
+      <div className="flex items-center justify-between pl-6">
+        <span className="text-xs text-slate-500 truncate">{contract.counterparty || '—'}</span>
+        <span className="text-xs font-medium text-slate-700 tabular-nums">{fmt(contract.total_value)}</span>
+      </div>
+    </li>
+  );
 }
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function ContractsPage() {
-    const { activeProject } = useProjectStore();
-    const [contracts, setContracts] = useState<Contract[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [formOpen, setFormOpen] = useState(false);
-    const [typeFilter, setTypeFilter] = useState('');
-    const [statusFilter, setStatusFilter] = useState('active');
+  const { selectedProject } = useProjectStore();
+  const projectId = selectedProject?.id;
 
-    const load = useCallback(() => {
-        if (!activeProject) { setLoading(false); return; }
-        setLoading(true);
-        api.get('/contracts', { params: { active_project_id: activeProject.id } })
-            .then(res => setContracts(res.data.data || []))
-            .catch(console.error)
-            .finally(() => setLoading(false));
-    }, [activeProject]);
+  const [contracts, setContracts] = useState<Contract[]>([]);
+  const [accounts, setAccounts] = useState<AccountingAccount[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [showDetail, setShowDetail] = useState(false); // mobile toggle
+  const [showForm, setShowForm] = useState(false);
+  const [editContract, setEditContract] = useState<Contract | undefined>(undefined);
 
-    useEffect(() => { load(); }, [load]);
-
-    const filtered = useMemo(() =>
-        contracts.filter(c => {
-            if (typeFilter && c.type !== typeFilter) return false;
-            if (statusFilter && c.status !== statusFilter) return false;
-            return true;
-        }),
-        [contracts, typeFilter, statusFilter]
-    );
-
-    // KPI summary
-    const summary = useMemo(() => {
-        const active = contracts.filter(c => c.status === 'active');
-        const allInst = active.flatMap(c => c.installments || []);
-        const today = new Date();
-        return {
-            totalContracts: contracts.length,
-            activeContracts: active.length,
-            totalValue: active.reduce((s, c) => s + c.total_value, 0),
-            totalPaid: active.reduce((s, c) => s + (c.installments || []).reduce((ss, i) => ss + i.paid_amount, 0), 0),
-            overdueCount: allInst.filter(i => (i.status === 'pending' || i.status === 'overdue') && new Date(i.due_date) < today).length,
-            overdueAmount: allInst.filter(i => (i.status === 'pending' || i.status === 'overdue') && new Date(i.due_date) < today).reduce((s, i) => s + i.amount, 0),
-        };
-    }, [contracts]);
-
-    if (!activeProject) {
-        return (
-            <div className="flex flex-col items-center justify-center h-full gap-3">
-                <FileSignature className="w-12 h-12 text-slate-200" />
-                <p className="text-slate-400 text-sm">Lütfen bir proje seçin</p>
-            </div>
-        );
+  const fetchContracts = useCallback(async () => {
+    if (!projectId) return;
+    try {
+      const res = await api.get(`/contracts?project_id=${projectId}`);
+      const data: Contract[] = Array.isArray(res.data) ? res.data : (res.data?.data ?? []);
+      setContracts(data);
+      if (selectedId === null && data.length > 0) setSelectedId(data[0].id);
+    } catch {
+      toast.error('Sözleşmeler yüklenemedi');
+    } finally {
+      setLoading(false);
     }
+  }, [projectId, selectedId]);
 
+  const fetchAccounts = useCallback(async () => {
+    try {
+      const res = await api.get('/accounting/accounts');
+      const data: AccountingAccount[] = Array.isArray(res.data) ? res.data : (res.data?.data ?? []);
+      setAccounts(data);
+    } catch {
+      // non-critical
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchContracts();
+    fetchAccounts();
+  }, [fetchContracts, fetchAccounts]);
+
+  const selected = contracts.find(c => c.id === selectedId) ?? null;
+
+  // KPIs
+  const activeCount = contracts.filter(c => c.status === 'active').length;
+  const totalValue = contracts.reduce((s, c) => s + c.total_value, 0);
+  const totalPaid = contracts.reduce((s, c) => s + (c.paid_amount ?? 0), 0);
+  const overdueCount = contracts.reduce((s, c) => s + (c.overdue_count ?? 0), 0);
+
+  function handleSelect(id: number) {
+    setSelectedId(id);
+    setShowDetail(true);
+  }
+
+  function handleFormClose() {
+    setShowForm(false);
+    setEditContract(undefined);
+  }
+
+  function handleFormSuccess() {
+    handleFormClose();
+    fetchContracts();
+  }
+
+  function handleDeleted() {
+    setSelectedId(null);
+    setShowDetail(false);
+    fetchContracts();
+  }
+
+  function handleEdit() {
+    setEditContract(selected ?? undefined);
+    setShowForm(true);
+  }
+
+  if (!projectId) {
     return (
-        <div className="p-4 sm:p-6 space-y-4 w-full overflow-x-hidden">
-            {/* Header */}
-            <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-                <div className="flex-1">
-                    <h1 className="text-base font-semibold text-slate-800 flex items-center gap-2">
-                        <FileSignature className="w-4 h-4 text-primary" /> Sözleşmeler & Ödeme Planları
-                    </h1>
-                    <p className="text-xs text-slate-400 mt-0.5">{activeProject.name} · Taksit ve vade takibi</p>
-                </div>
-                <button
-                    onClick={() => setFormOpen(true)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white text-xs font-semibold rounded-lg hover:bg-blue-700"
-                >
-                    <Plus className="w-3.5 h-3.5" /> Yeni Sözleşme
-                </button>
-            </div>
-
-            {/* KPI Cards */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-                {[
-                    { label: 'Aktif Sözleşme', value: String(summary.activeContracts), sub: `${summary.totalContracts} toplam`, color: 'text-blue-700', bg: 'bg-blue-50' },
-                    { label: 'Toplam Bedel', value: summary.totalValue >= 1_000_000 ? `₺${(summary.totalValue / 1_000_000).toFixed(1)}M` : `₺${(summary.totalValue / 1_000).toFixed(0)}K`, sub: 'aktif sözleşmeler', color: 'text-slate-700', bg: 'bg-slate-50' },
-                    { label: 'Ödenen', value: summary.totalPaid >= 1_000_000 ? `₺${(summary.totalPaid / 1_000_000).toFixed(1)}M` : `₺${(summary.totalPaid / 1_000).toFixed(0)}K`, sub: `${summary.totalValue > 0 ? ((summary.totalPaid / summary.totalValue) * 100).toFixed(0) : 0}%`, color: 'text-green-700', bg: 'bg-green-50' },
-                    { label: 'Kalan Borç', value: (summary.totalValue - summary.totalPaid) >= 1_000_000 ? `₺${((summary.totalValue - summary.totalPaid) / 1_000_000).toFixed(1)}M` : `₺${((summary.totalValue - summary.totalPaid) / 1_000).toFixed(0)}K`, sub: 'ödenecek', color: 'text-amber-700', bg: 'bg-amber-50' },
-                    { label: 'Vadesi Geçmiş', value: String(summary.overdueCount), sub: fmt(summary.overdueAmount), color: summary.overdueCount > 0 ? 'text-red-700' : 'text-slate-500', bg: summary.overdueCount > 0 ? 'bg-red-50' : 'bg-slate-50' },
-                    { label: 'İlerleme', value: `${summary.totalValue > 0 ? ((summary.totalPaid / summary.totalValue) * 100).toFixed(0) : 0}%`, sub: 'genel ödeme', color: 'text-indigo-700', bg: 'bg-indigo-50' },
-                ].map(s => (
-                    <div key={s.label} className={`${s.bg} rounded-xl p-3 border border-slate-100`}>
-                        <p className="text-[9px] font-semibold text-slate-400 uppercase tracking-wide mb-1">{s.label}</p>
-                        <p className={`text-base font-bold font-mono ${s.color}`}>{s.value}</p>
-                        <p className="text-[9px] text-slate-400 mt-0.5">{s.sub}</p>
-                    </div>
-                ))}
-            </div>
-
-            {/* Alert Banners */}
-            <AlertBanner contracts={contracts} />
-
-            {/* Filters */}
-            <div className="flex flex-wrap items-center gap-2">
-                <select value={typeFilter} onChange={e => setTypeFilter(e.target.value)} className="text-xs border border-slate-200 rounded-lg px-2 py-1.5 text-slate-600 bg-white">
-                    <option value="">Tüm Türler</option>
-                    {Object.entries(CONTRACT_TYPE_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-                </select>
-                <div className="flex rounded-lg border border-slate-200 overflow-hidden text-xs font-medium">
-                    {[{ v: '', l: 'Tümü' }, { v: 'active', l: 'Aktif' }, { v: 'completed', l: 'Tamamlanan' }, { v: 'cancelled', l: 'İptal' }].map(({ v, l }) => (
-                        <button key={v} onClick={() => setStatusFilter(v)} className={`px-3 py-1.5 ${statusFilter === v ? 'bg-slate-800 text-white' : 'text-slate-500 hover:bg-slate-50'}`}>{l}</button>
-                    ))}
-                </div>
-                <span className="text-xs text-slate-400 ml-auto">{filtered.length} sözleşme</span>
-            </div>
-
-            {/* Contracts List */}
-            {loading ? (
-                <div className="space-y-3">
-                    {[1, 2, 3].map(i => <div key={i} className="h-28 bg-slate-100 rounded-2xl animate-pulse" />)}
-                </div>
-            ) : filtered.length === 0 ? (
-                <div className="bg-white rounded-2xl border border-slate-200 p-10 text-center">
-                    <FileSignature className="w-10 h-10 text-slate-200 mx-auto mb-3" />
-                    <p className="text-sm text-slate-400">Sözleşme bulunamadı</p>
-                    <button onClick={() => setFormOpen(true)} className="mt-3 px-4 py-2 text-xs font-semibold bg-blue-600 text-white rounded-lg hover:bg-blue-700">
-                        İlk Sözleşmeyi Oluştur
-                    </button>
-                </div>
-            ) : (
-                <div className="space-y-3">
-                    {filtered.map(c => (
-                        <ContractCard
-                            key={c.id}
-                            contract={c}
-                            onUpdate={updated => setContracts(prev => prev.map(x => x.id === updated.id ? updated : x))}
-                            onDelete={id => setContracts(prev => prev.filter(x => x.id !== id))}
-                        />
-                    ))}
-                </div>
-            )}
-
-            {/* Form Modal */}
-            {formOpen && (
-                <ContractFormModal
-                    onClose={() => setFormOpen(false)}
-                    onSaved={c => { setContracts(prev => [c, ...prev]); setFormOpen(false); }}
-                />
-            )}
-        </div>
+      <div className="flex items-center justify-center h-full text-sm text-slate-500">
+        Lütfen bir proje seçin.
+      </div>
     );
+  }
+
+  return (
+    <div className="flex flex-col h-full bg-slate-50">
+      {/* Top bar */}
+      <div className="flex items-center justify-between px-5 py-3 bg-white border-b border-slate-200 flex-shrink-0">
+        <h1 className="text-sm font-semibold text-slate-900">Sözleşmeler</h1>
+        <button
+          onClick={() => { setEditContract(undefined); setShowForm(true); }}
+          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-blue-600 text-white rounded hover:bg-blue-700"
+        >
+          <Plus className="w-3.5 h-3.5" /> Yeni Sözleşme
+        </button>
+      </div>
+
+      {/* KPI strip */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2 px-4 py-3 flex-shrink-0">
+        <KpiTile
+          label="Aktif Sözleşmeler"
+          value={String(activeCount)}
+          icon={<FileText className="w-4 h-4" />}
+        />
+        <KpiTile
+          label="Toplam Değer"
+          value={fmt(totalValue)}
+          icon={<ArrowUpRight className="w-4 h-4" />}
+        />
+        <KpiTile
+          label="Ödenen"
+          value={fmt(totalPaid)}
+          icon={<ArrowDownLeft className="w-4 h-4" />}
+        />
+        <KpiTile
+          label="Gecikmiş Taksit"
+          value={String(overdueCount)}
+          sub={overdueCount > 0 ? 'Aksiyon gerekiyor' : 'Sorun yok'}
+          icon={<AlertTriangle className="w-4 h-4" />}
+        />
+      </div>
+
+      {/* Master-detail */}
+      <div className="flex flex-1 overflow-hidden border-t border-slate-200">
+        {/* Contract list — hidden on mobile when detail is shown */}
+        <div className={`flex flex-col w-full md:w-[380px] md:flex-shrink-0 bg-white border-r border-slate-200 overflow-hidden ${showDetail ? 'hidden md:flex' : 'flex'}`}>
+          <div className="px-4 py-2.5 border-b border-slate-100 flex-shrink-0">
+            <p className="text-xs text-slate-500">{contracts.length} sözleşme</p>
+          </div>
+          {loading ? (
+            <div className="flex-1 flex items-center justify-center text-sm text-slate-400">Yükleniyor...</div>
+          ) : contracts.length === 0 ? (
+            <div className="flex-1 flex flex-col items-center justify-center gap-2 text-sm text-slate-400">
+              <FileText className="w-8 h-8 text-slate-200" />
+              <p>Henüz sözleşme yok</p>
+            </div>
+          ) : (
+            <ul className="flex-1 overflow-y-auto">
+              {contracts.map(c => (
+                <ContractRow
+                  key={c.id}
+                  contract={c}
+                  selected={c.id === selectedId}
+                  onClick={() => handleSelect(c.id)}
+                />
+              ))}
+            </ul>
+          )}
+        </div>
+
+        {/* Detail panel */}
+        <div className={`flex-1 overflow-hidden ${!showDetail && 'hidden md:flex md:flex-col'} ${showDetail ? 'flex flex-col' : ''}`}>
+          {selected ? (
+            <DetailPanel
+              key={selected.id}
+              contract={selected}
+              accounts={accounts}
+              onEdit={handleEdit}
+              onDeleted={handleDeleted}
+              onRefresh={fetchContracts}
+              onBack={() => setShowDetail(false)}
+            />
+          ) : (
+            <div className="flex-1 flex flex-col items-center justify-center gap-2 text-sm text-slate-400">
+              <FileText className="w-10 h-10 text-slate-200" />
+              <p>Bir sözleşme seçin</p>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Contract form modal */}
+      {showForm && (
+        <ContractFormModal
+          contract={editContract}
+          projectId={projectId}
+          onClose={handleFormClose}
+          onSuccess={handleFormSuccess}
+        />
+      )}
+    </div>
+  );
 }

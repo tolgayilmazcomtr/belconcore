@@ -78,6 +78,9 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('contracts/{contract}/installments', [ContractController::class, 'storeInstallment']);
         Route::put('contracts/{contract}/installments/{installment}', [ContractController::class, 'updateInstallment']);
         Route::delete('contracts/{contract}/installments/{installment}', [ContractController::class, 'destroyInstallment']);
+        Route::post('contracts/{contract}/installments/{installment}/invoice', [ContractController::class, 'invoiceInstallment']);
+        Route::post('contracts/{contract}/document', [ContractController::class, 'uploadDocument']);
+        Route::delete('contracts/{contract}/document', [ContractController::class, 'deleteDocument']);
 
         // Çek & Senet Yönetimi
         Route::get('checks/summary',  [CheckController::class, 'summary']);

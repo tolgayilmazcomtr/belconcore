@@ -9,7 +9,7 @@ class Contract extends Model
     protected $fillable = [
         'project_id', 'type', 'title', 'counterparty', 'accounting_account_id',
         'unit_id', 'total_value', 'start_date', 'end_date', 'status',
-        'description', 'created_by',
+        'description', 'document_path', 'document_name', 'created_by',
     ];
 
     protected $casts = [

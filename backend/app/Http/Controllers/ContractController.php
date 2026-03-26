@@ -4,7 +4,10 @@ namespace App\Http\Controllers;
 
 use App\Models\Contract;
 use App\Models\ContractInstallment;
+use App\Models\Invoice;
+use App\Models\InvoiceItem;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 use Carbon\Carbon;
 
 class ContractController extends Controller
@@ -23,7 +26,6 @@ class ContractController extends Controller
 
         $contracts = $query->orderByDesc('id')->get();
 
-        // Append computed fields
         $today = Carbon::today();
         $contracts->each(function ($c) use ($today) {
             $c->paid_amount      = $c->installments->sum('paid_amount');
@@ -99,8 +101,52 @@ class ContractController extends Controller
 
     public function destroy(string $id)
     {
-        Contract::findOrFail($id)->delete();
+        $contract = Contract::findOrFail($id);
+        if ($contract->document_path) {
+            Storage::disk('public')->delete($contract->document_path);
+        }
+        $contract->delete();
         return response()->json(['message' => 'Sözleşme silindi.']);
+    }
+
+    // ─── Document Upload ──────────────────────────────────────────────────────
+
+    public function uploadDocument(Request $request, string $id)
+    {
+        $contract = Contract::findOrFail($id);
+
+        $request->validate([
+            'document' => 'required|file|mimes:pdf,jpg,jpeg,png,doc,docx|max:20480',
+        ]);
+
+        if ($contract->document_path) {
+            Storage::disk('public')->delete($contract->document_path);
+        }
+
+        $file = $request->file('document');
+        $path = $file->store('contracts', 'public');
+
+        $contract->update([
+            'document_path' => $path,
+            'document_name' => $file->getClientOriginalName(),
+        ]);
+
+        return response()->json([
+            'message'       => 'Belge yüklendi.',
+            'document_path' => $path,
+            'document_name' => $contract->document_name,
+            'document_url'  => Storage::disk('public')->url($path),
+        ]);
+    }
+
+    public function deleteDocument(string $id)
+    {
+        $contract = Contract::findOrFail($id);
+        if ($contract->document_path) {
+            Storage::disk('public')->delete($contract->document_path);
+        }
+        $contract->update(['document_path' => null, 'document_name' => null]);
+        return response()->json(['message' => 'Belge silindi.']);
     }
 
     // ─── Installments ─────────────────────────────────────────────────────────
@@ -128,7 +174,6 @@ class ContractController extends Controller
             'notes'          => 'nullable|string',
         ]);
 
-        // auto installment_no
         if (empty($validated['installment_no'])) {
             $validated['installment_no'] = $contract->installments()->max('installment_no') + 1;
         }
@@ -142,10 +187,7 @@ class ContractController extends Controller
             'created_by'  => $request->user()->id,
         ]);
 
-        return response()->json([
-            'message' => 'Taksit eklendi.',
-            'data'    => $installment,
-        ], 201);
+        return response()->json(['message' => 'Taksit eklendi.', 'data' => $installment], 201);
     }
 
     public function updateInstallment(Request $request, string $contractId, string $installmentId)
@@ -167,10 +209,7 @@ class ContractController extends Controller
 
         $installment->update($validated);
 
-        return response()->json([
-            'message' => 'Taksit güncellendi.',
-            'data'    => $installment->fresh(),
-        ]);
+        return response()->json(['message' => 'Taksit güncellendi.', 'data' => $installment->fresh()]);
     }
 
     public function destroyInstallment(string $contractId, string $installmentId)
@@ -179,7 +218,62 @@ class ContractController extends Controller
         return response()->json(['message' => 'Taksit silindi.']);
     }
 
-    // ─── Summary (for dashboard/sidebar badge) ───────────────────────────────
+    // ─── Faturalaştır (Invoice from Installment) ──────────────────────────────
+
+    public function invoiceInstallment(Request $request, string $contractId, string $installmentId)
+    {
+        $installment = ContractInstallment::where('contract_id', $contractId)->findOrFail($installmentId);
+        $contract    = $installment->contract;
+
+        $validated = $request->validate([
+            'account_id'    => 'required|exists:accounting_accounts,id',
+            'invoice_no'    => 'nullable|string|max:50',
+            'date'          => 'nullable|date',
+            'document_type' => 'nullable|in:paper,e-invoice,e-archive',
+            'description'   => 'nullable|string',
+        ]);
+
+        $type = $contract->type === 'customer_sale' ? 'sales' : 'expense';
+        $desc = $validated['description']
+            ?? ($contract->title . ' – ' . ($installment->description ?: $installment->installment_no . '. Taksit'));
+
+        $invoice = Invoice::create([
+            'project_id'    => $contract->project_id,
+            'account_id'    => $validated['account_id'],
+            'type'          => $type,
+            'invoice_no'    => $validated['invoice_no'] ?? null,
+            'date'          => $validated['date'] ?? now()->toDateString(),
+            'due_date'      => $installment->due_date,
+            'description'   => $desc,
+            'document_type' => $validated['document_type'] ?? 'paper',
+            'currency'      => 'TRY',
+            'subtotal'      => $installment->amount,
+            'tax_total'     => 0,
+            'total'         => $installment->amount,
+            'paid_amount'   => $installment->paid_amount,
+            'remaining'     => max(0, $installment->amount - $installment->paid_amount),
+            'status'        => $installment->status === 'paid' ? 'paid'
+                             : ($installment->paid_amount > 0 ? 'partial' : 'draft'),
+        ]);
+
+        InvoiceItem::create([
+            'invoice_id'  => $invoice->id,
+            'description' => $desc,
+            'quantity'    => 1,
+            'unit_price'  => $installment->amount,
+            'tax_rate'    => 0,
+            'tax_amount'  => 0,
+            'total'       => $installment->amount,
+        ]);
+
+        return response()->json([
+            'message'    => 'Fatura oluşturuldu.',
+            'invoice_id' => $invoice->id,
+            'data'       => $invoice,
+        ], 201);
+    }
+
+    // ─── Summary ──────────────────────────────────────────────────────────────
 
     public function summary(Request $request)
     {
@@ -194,7 +288,6 @@ class ContractController extends Controller
             ->orderBy('due_date')
             ->get();
 
-        // Auto-mark overdue
         $installments->each(function ($i) use ($today) {
             if (Carbon::parse($i->due_date)->lt($today)) {
                 $i->update(['status' => 'overdue']);
@@ -208,13 +301,13 @@ class ContractController extends Controller
             ->filter(fn($i) => Carbon::parse($i->due_date)->between($today, $in30));
 
         return response()->json(['data' => [
-            'overdue_count'          => $overdue->count(),
-            'overdue_amount'         => $overdue->sum('amount'),
-            'due_in_7_count'         => $installments->where('status', 'pending')
+            'overdue_count'         => $overdue->count(),
+            'overdue_amount'        => $overdue->sum('amount'),
+            'due_in_7_count'        => $installments->where('status', 'pending')
                 ->filter(fn($i) => Carbon::parse($i->due_date)->between($today, $in7))->count(),
-            'due_in_30_count'        => $upcoming->count(),
-            'due_in_30_amount'       => $upcoming->sum('amount'),
-            'upcoming_installments'  => $upcoming->concat($overdue)->sortBy('due_date')
+            'due_in_30_count'       => $upcoming->count(),
+            'due_in_30_amount'      => $upcoming->sum('amount'),
+            'upcoming_installments' => $upcoming->concat($overdue)->sortBy('due_date')
                 ->take(10)->values(),
         ]]);
     }
