@@ -968,8 +968,8 @@ function ContractRow({ contract, selected, onClick }: { contract: Contract; sele
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function ContractsPage() {
-  const { selectedProject } = useProjectStore();
-  const projectId = selectedProject?.id;
+  const { activeProject } = useProjectStore();
+  const projectId = activeProject?.id;
 
   const [contracts, setContracts] = useState<Contract[]>([]);
   const [accounts, setAccounts] = useState<AccountingAccount[]>([]);
