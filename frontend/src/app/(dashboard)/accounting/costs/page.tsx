@@ -862,7 +862,7 @@ export default function CostsPage() {
                                                     ) : (
                                                         <button
                                                             onClick={() => setQuickItem(item)}
-                                                            className="text-[10px] text-blue-500 hover:text-blue-700 hover:underline opacity-0 group-hover:opacity-100 transition-opacity"
+                                                            className="text-[10px] text-blue-500 hover:text-blue-700 hover:underline"
                                                         >
                                                             + fiyat gir
                                                         </button>
@@ -895,11 +895,11 @@ export default function CostsPage() {
                                                 <div className="self-center">
                                                     <DropdownMenu>
                                                         <DropdownMenuTrigger asChild>
-                                                            <button className="p-1 rounded hover:bg-slate-100 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                            <button className="p-1 rounded hover:bg-slate-100 transition-colors">
                                                                 <MoreVertical className="w-3.5 h-3.5 text-slate-400" />
                                                             </button>
                                                         </DropdownMenuTrigger>
-                                                        <DropdownMenuContent align="end" className="w-44">
+                                                        <DropdownMenuContent align="end" className="w-44" sideOffset={4}>
                                                             <DropdownMenuItem onClick={() => setQuickItem(item)} className="gap-2 text-emerald-600 focus:text-emerald-600 focus:bg-emerald-50">
                                                                 <TrendingUp className="w-3.5 h-3.5" /> Gerçek Fiyat Gir
                                                             </DropdownMenuItem>
