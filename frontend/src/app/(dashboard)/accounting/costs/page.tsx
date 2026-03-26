@@ -649,7 +649,7 @@ export default function CostsPage() {
             </div>
 
             {/* ── Summary Cards ── */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 px-5 py-4 shrink-0">
+            <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 px-5 py-4 shrink-0">
                 {/* Toplam Planlanan */}
                 <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
                     <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide mb-1">Toplam Planlanan</p>
@@ -688,23 +688,42 @@ export default function CostsPage() {
                     )}
                 </div>
 
-                {/* Daire Başına */}
-                <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
+                {/* Daire Başına — Planlanan */}
+                <div className="bg-white border border-blue-100 rounded-xl p-4 shadow-sm">
                     <div className="flex items-center justify-between mb-1">
-                        <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Daire Başına</p>
+                        <p className="text-[10px] font-semibold text-blue-400 uppercase tracking-wide">Daire Başına (Plan)</p>
                         <button onClick={() => setShowSettings(true)} className="text-slate-300 hover:text-slate-500 transition-colors">
                             <Settings className="w-3 h-3" />
                         </button>
                     </div>
-                    <p className="text-xl font-bold text-primary font-mono">{fmt(summary?.planned_per_unit)}</p>
-                    <p className="text-xs text-slate-400 mt-1">
-                        {summary?.unit_count || 1} daire üzerinden
-                        {hasActual && summary && summary.actual_per_unit > 0 && (
-                            <span className={`ml-1 font-medium ${summary.actual_per_unit <= summary.planned_per_unit ? 'text-emerald-500' : 'text-red-400'}`}>
-                                · Gerçek: {fmt(summary.actual_per_unit)}
+                    <p className="text-xl font-bold text-blue-700 font-mono">{fmt(summary?.planned_per_unit)}</p>
+                    <p className="text-xs text-slate-400 mt-1">{summary?.unit_count || 1} daireye bölündü</p>
+                </div>
+
+                {/* Daire Başına — Gerçekleşen */}
+                <div className={`border rounded-xl p-4 shadow-sm ${hasActual && summary && summary.actual_per_unit > 0 ? 'bg-white border-emerald-100' : 'bg-slate-50 border-slate-100'}`}>
+                    <div className="flex items-center justify-between mb-1">
+                        <p className="text-[10px] font-semibold text-emerald-500 uppercase tracking-wide">Daire Başına (Gerçek)</p>
+                        {hasActual && summary && summary.actual_per_unit > 0 && summary.planned_per_unit > 0 && (
+                            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${summary.actual_per_unit <= summary.planned_per_unit ? 'bg-emerald-100 text-emerald-600' : 'bg-red-100 text-red-500'}`}>
+                                {summary.actual_per_unit <= summary.planned_per_unit ? '↓' : '↑'}
+                                {fmtPct(variancePct(summary.planned_per_unit, summary.actual_per_unit) || 0)}
                             </span>
                         )}
-                    </p>
+                    </div>
+                    {hasActual && summary && summary.actual_per_unit > 0 ? (
+                        <>
+                            <p className="text-xl font-bold text-emerald-700 font-mono">{fmt(summary.actual_per_unit)}</p>
+                            <p className={`text-xs mt-1 font-medium ${summary.actual_per_unit <= summary.planned_per_unit ? 'text-emerald-500' : 'text-red-400'}`}>
+                                {summary.actual_per_unit <= summary.planned_per_unit ? 'bütçe altında' : 'bütçe üstü'}
+                            </p>
+                        </>
+                    ) : (
+                        <>
+                            <p className="text-xl font-bold text-slate-300 font-mono">—</p>
+                            <p className="text-xs text-slate-400 mt-1">gerçek fiyat girilince hesaplanır</p>
+                        </>
+                    )}
                 </div>
             </div>
 
