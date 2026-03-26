@@ -19,6 +19,7 @@ use App\Http\Controllers\FinanceAccountController;
 use App\Http\Controllers\CostItemController;
 use App\Http\Controllers\CheckController;
 use App\Http\Controllers\ContractController;
+use App\Http\Controllers\StockController;
 
 // Public Auth Routes
 Route::post('/login', [AuthController::class, 'login']);
@@ -85,6 +86,22 @@ Route::middleware('auth:sanctum')->group(function () {
         // Çek & Senet Yönetimi
         Route::get('checks/summary',  [CheckController::class, 'summary']);
         Route::apiResource('checks', CheckController::class);
+
+        // Stok & Depo Yönetimi
+        Route::get('stock/summary',                         [StockController::class, 'summary']);
+        Route::get('stock/categories',                      [StockController::class, 'categories']);
+        Route::get('stock/warehouses',                      [StockController::class, 'warehouses']);
+        Route::post('stock/warehouses',                     [StockController::class, 'storeWarehouse']);
+        Route::put('stock/warehouses/{id}',                 [StockController::class, 'updateWarehouse']);
+        Route::delete('stock/warehouses/{id}',              [StockController::class, 'destroyWarehouse']);
+        Route::get('stock/items',                           [StockController::class, 'items']);
+        Route::post('stock/items',                          [StockController::class, 'storeItem']);
+        Route::put('stock/items/{id}',                      [StockController::class, 'updateItem']);
+        Route::delete('stock/items/{id}',                   [StockController::class, 'destroyItem']);
+        Route::get('stock/movements',                       [StockController::class, 'movements']);
+        Route::post('stock/movements',                      [StockController::class, 'storeMovement']);
+        Route::put('stock/movements/{id}',                  [StockController::class, 'updateMovement']);
+        Route::delete('stock/movements/{id}',               [StockController::class, 'destroyMovement']);
 
         // Finans – Kasa & Bankalar
         Route::get('finance/accounts',                        [FinanceAccountController::class, 'indexAccounts']);
