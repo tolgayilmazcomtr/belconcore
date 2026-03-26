@@ -7,9 +7,49 @@ import { useAccountingStore } from '@/store/useAccountingStore';
 import { Invoice } from '@/types/accounting.types';
 import api from '@/lib/api';
 import { toast } from 'sonner';
-import { Plus, Search, Users, FileText } from 'lucide-react';
+import { Plus, Search, Users, FileText, Trash2, Download, MoreVertical } from 'lucide-react';
 import { InvoiceDetailModal } from '@/components/accounting/InvoiceDetailModal';
 import Link from 'next/link';
+import { useRef } from 'react';
+import ReactDOM from 'react-dom';
+
+interface CtxMenu { x: number; y: number; invoice: Invoice; }
+
+function ContextMenu({ menu, onClose, onDetail, onPdf, onDelete }: {
+    menu: CtxMenu; onClose: () => void;
+    onDetail: (inv: Invoice) => void; onPdf: (inv: Invoice) => void; onDelete: (inv: Invoice) => void;
+}) {
+    const ref = useRef<HTMLDivElement>(null);
+    useEffect(() => {
+        const handler = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) onClose(); };
+        const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+        document.addEventListener('mousedown', handler);
+        document.addEventListener('keydown', esc);
+        return () => { document.removeEventListener('mousedown', handler); document.removeEventListener('keydown', esc); };
+    }, [onClose]);
+    const menuW = 180, menuH = 128;
+    const x = menu.x + menuW > window.innerWidth ? menu.x - menuW : menu.x;
+    const y = menu.y + menuH > window.innerHeight ? menu.y - menuH : menu.y;
+    return ReactDOM.createPortal(
+        <div ref={ref} className="fixed z-[9999] bg-white border border-slate-200 rounded-lg shadow-xl py-1 w-[180px]"
+            style={{ left: x, top: y }}>
+            <button onClick={() => { onDetail(menu.invoice); onClose(); }}
+                className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-slate-50 text-slate-700 text-xs">
+                <FileText className="w-3.5 h-3.5 text-slate-400" /> Detay / Düzenle
+            </button>
+            <button onClick={() => { onPdf(menu.invoice); onClose(); }}
+                className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-slate-50 text-slate-700 text-xs">
+                <Download className="w-3.5 h-3.5 text-blue-500" /> PDF İndir
+            </button>
+            <div className="border-t border-slate-100 my-1" />
+            <button onClick={() => { onDelete(menu.invoice); onClose(); }}
+                className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-red-50 text-red-600 text-xs">
+                <Trash2 className="w-3.5 h-3.5" /> Sil
+            </button>
+        </div>,
+        document.body
+    );
+}
 
 const fmtMoney = (n: number) =>
     '₺' + new Intl.NumberFormat('tr-TR', { minimumFractionDigits: 2 }).format(n || 0);
@@ -34,6 +74,7 @@ export default function PurchasesPage() {
     const [accountSearch, setAccountSearch] = useState('');
     const [statusFilter, setStatusFilter] = useState('all');
     const [invoiceSearch, setInvoiceSearch] = useState('');
+    const [ctxMenu, setCtxMenu] = useState<CtxMenu | null>(null);
 
     const load = useCallback(async () => {
         if (!activeProject) return;
@@ -73,6 +114,24 @@ export default function PurchasesPage() {
             setSelectedInvoice(r.data.data);
             setDetailOpen(true);
         } catch { toast.error('Fatura yüklenemedi.'); }
+    };
+
+    const handlePdf = (inv: Invoice) => {
+        window.open(`${process.env.NEXT_PUBLIC_API_URL}/api/accounting/invoices/${inv.id}/pdf`, '_blank');
+    };
+
+    const handleDelete = async (inv: Invoice) => {
+        if (!confirm(`"${inv.invoice_no || `#${inv.id}`}" faturasını silmek istediğinize emin misiniz?`)) return;
+        try {
+            await api.delete(`/accounting/invoices/${inv.id}`, { params: { active_project_id: activeProject?.id } });
+            setInvoices(invoices.filter(i => i.id !== inv.id));
+            toast.success('Fatura silindi.');
+        } catch { toast.error('Silinemedi.'); }
+    };
+
+    const handleContextMenu = (e: React.MouseEvent, inv: Invoice) => {
+        e.preventDefault();
+        setCtxMenu({ x: e.clientX, y: e.clientY, invoice: inv });
     };
 
     if (!activeProject) return <div className="flex items-center justify-center h-full"><p className="text-slate-400 text-sm">Aktif proje seçilmedi.</p></div>;
@@ -133,12 +192,13 @@ export default function PurchasesPage() {
                 </div>
                 <div className="bg-white border-b border-slate-200 shrink-0">
                     <div className="grid text-[10px] font-semibold text-slate-400 uppercase tracking-wide px-3 py-1.5"
-                        style={{ gridTemplateColumns: '1fr 120px 90px 90px 90px 90px' }}>
+                        style={{ gridTemplateColumns: '1fr 120px 90px 90px 90px 90px 28px' }}>
                         <span>AÇIKLAMA</span><span>CARİ</span>
                         <span className="text-right">FATURA BEDELİ</span>
                         <span className="text-right">KALAN TUTAR</span>
                         <span className="text-center">DURUM</span>
                         <span className="text-right">VADE</span>
+                        <span />
                     </div>
                 </div>
                 <div className="flex-1 overflow-y-auto">
@@ -153,8 +213,9 @@ export default function PurchasesPage() {
                             <div className="divide-y divide-slate-100">
                                 {filtInvoices.map(inv => (
                                     <div key={inv.id} onClick={() => openDetail(inv)}
+                                        onContextMenu={e => handleContextMenu(e, inv)}
                                         className="group grid items-center px-3 py-2 hover:bg-blue-50/40 cursor-pointer transition-colors"
-                                        style={{ gridTemplateColumns: '1fr 120px 90px 90px 90px 90px' }}>
+                                        style={{ gridTemplateColumns: '1fr 120px 90px 90px 90px 90px 28px' }}>
                                         <div>
                                             <p className="text-xs font-medium text-slate-700">{inv.description || inv.invoice_no || `#${inv.id}`}</p>
                                             <p className="text-[10px] text-slate-400">{inv.invoice_no}</p>
@@ -166,6 +227,11 @@ export default function PurchasesPage() {
                                             <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${STATUS_BADGE[inv.status]}`}>{STATUS_LABEL[inv.status]}</span>
                                         </div>
                                         <p className="text-[10px] text-right text-slate-400">{fmtDate(inv.due_date)}</p>
+                                        <button
+                                            onClick={e => { e.stopPropagation(); setCtxMenu({ x: e.clientX, y: e.clientY, invoice: inv }); }}
+                                            className="flex items-center justify-center w-6 h-6 rounded hover:bg-slate-200 text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <MoreVertical className="w-3.5 h-3.5" />
+                                        </button>
                                     </div>
                                 ))}
                             </div>
@@ -178,6 +244,15 @@ export default function PurchasesPage() {
             </div>
             <InvoiceDetailModal invoice={selectedInvoice} open={detailOpen} onClose={() => setDetailOpen(false)}
                 onUpdated={inv => { upsertInvoice(inv); setSelectedInvoice(inv); }} />
+            {ctxMenu && (
+                <ContextMenu
+                    menu={ctxMenu}
+                    onClose={() => setCtxMenu(null)}
+                    onDetail={openDetail}
+                    onPdf={handlePdf}
+                    onDelete={handleDelete}
+                />
+            )}
         </div>
     );
 }
