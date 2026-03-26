@@ -39,7 +39,7 @@ export default function VatReport() {
     if (!activeProject) return <div className="flex items-center justify-center h-full"><p className="text-slate-400 text-sm">Aktif proje seçilmedi.</p></div>;
 
     return (
-        <div className="p-6 space-y-6 max-w-3xl">
+        <div className="p-6 space-y-6 w-full">
             <div className="flex items-center justify-between">
                 <div>
                     <h1 className="text-base font-semibold text-slate-800 flex items-center gap-2"><Receipt className="w-4 h-4 text-primary" />KDV Raporu</h1>
