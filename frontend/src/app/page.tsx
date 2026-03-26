@@ -136,10 +136,10 @@ export default function DashboardPage() {
 
     if (loading || !stats) {
         return (
-            <div className="p-6 space-y-6 animate-pulse">
+            <div className="p-4 sm:p-6 space-y-4 sm:space-y-6 animate-pulse">
                 <div className="h-6 bg-slate-100 rounded w-48" />
-                <div className="grid grid-cols-4 gap-4">{[...Array(4)].map((_, i) => <div key={i} className="h-28 bg-slate-100 rounded-xl" />)}</div>
-                <div className="grid grid-cols-3 gap-4">{[...Array(3)].map((_, i) => <div key={i} className="h-48 bg-slate-100 rounded-xl" />)}</div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">{[...Array(4)].map((_, i) => <div key={i} className="h-28 bg-slate-100 rounded-xl" />)}</div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">{[...Array(3)].map((_, i) => <div key={i} className="h-48 bg-slate-100 rounded-xl" />)}</div>
             </div>
         );
     }
@@ -152,7 +152,7 @@ export default function DashboardPage() {
     const profitPct = soldRevenue > 0 ? ((grossProfit / soldRevenue) * 100) : 0;
 
     return (
-        <div className="p-6 space-y-6 w-full">
+        <div className="p-4 sm:p-6 space-y-4 sm:space-y-6 w-full overflow-x-hidden">
             {/* Header */}
             <div>
                 <h1 className="text-base font-semibold text-slate-800 flex items-center gap-2">
@@ -162,7 +162,7 @@ export default function DashboardPage() {
             </div>
 
             {/* Top KPI Cards */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
                 <StatCard
                     label="Kasa / Banka Bakiyesi"
                     value={fmtK(finance.balance)}
@@ -198,7 +198,7 @@ export default function DashboardPage() {
             </div>
 
             {/* Middle Row */}
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
                 {/* Unit Status */}
                 <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5 space-y-4">
                     <div className="flex items-center gap-2">
@@ -314,7 +314,7 @@ export default function DashboardPage() {
             </div>
 
             {/* Bottom Row - Horizontal bar charts */}
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4">
                 {/* Kar/Zarar özeti */}
                 <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
                     <h3 className="text-xs font-semibold text-slate-700 uppercase tracking-wide mb-4">Finansal Özet (Yıl {year})</h3>
@@ -344,7 +344,7 @@ export default function DashboardPage() {
                 {/* Bu ay nakit akışı + alacak/borç */}
                 <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
                     <h3 className="text-xs font-semibold text-slate-700 uppercase tracking-wide mb-4">Bu Ay Özet & Vadeli Durumlar</h3>
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div className="space-y-3">
                             <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wide">Bu Ay Nakit</p>
                             <div className="bg-green-50 rounded-lg p-3 text-center">
@@ -389,7 +389,7 @@ export default function DashboardPage() {
                     <h3 className="text-xs font-semibold text-slate-700 uppercase tracking-wide mb-4">
                         Maliyet Kar/Zarar Analizi
                     </h3>
-                    <div className="grid grid-cols-5 gap-3">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
                         {[
                             { label: 'Planlanan Maliyet', value: costs.planned, color: 'text-slate-700', bg: 'bg-slate-50' },
                             { label: 'Gerçek Maliyet', value: costs.blended, color: costVariance > 0 ? 'text-red-600' : 'text-green-600', bg: costVariance > 0 ? 'bg-red-50' : 'bg-green-50' },
