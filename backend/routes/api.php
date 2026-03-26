@@ -17,6 +17,7 @@ use App\Http\Controllers\InvoiceController;
 use App\Http\Controllers\AccountingPaymentController;
 use App\Http\Controllers\FinanceAccountController;
 use App\Http\Controllers\CostItemController;
+use App\Http\Controllers\CheckController;
 
 // Public Auth Routes
 Route::post('/login', [AuthController::class, 'login']);
@@ -68,6 +69,10 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('costs',         [CostItemController::class, 'store']);
         Route::put('costs/{id}',     [CostItemController::class, 'update']);
         Route::delete('costs/{id}',  [CostItemController::class, 'destroy']);
+
+        // Çek & Senet Yönetimi
+        Route::get('checks/summary',  [CheckController::class, 'summary']);
+        Route::apiResource('checks', CheckController::class);
 
         // Finans – Kasa & Bankalar
         Route::get('finance/accounts',                        [FinanceAccountController::class, 'indexAccounts']);
