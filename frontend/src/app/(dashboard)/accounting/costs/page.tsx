@@ -52,12 +52,14 @@ interface CostSettings {
 interface Summary {
     total_planned: number;
     total_actual: number;
+    blended_total: number;
     variance: number;
     unit_count: number;
     planned_per_unit: number;
     actual_per_unit: number;
     total_items: number;
     completed_count: number;
+    contracted_count: number;
 }
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -620,7 +622,7 @@ export default function CostsPage() {
     };
 
     const totalVariance = summary ? summary.variance : 0;
-    const hasActual = summary && summary.total_actual > 0;
+    const hasActual = summary && summary.contracted_count > 0;
 
     if (!activeProject) return (
         <div className="flex items-center justify-center h-full">
@@ -659,11 +661,15 @@ export default function CostsPage() {
 
                 {/* Toplam Gerçekleşen */}
                 <div className={`border rounded-xl p-4 shadow-sm ${hasActual ? 'bg-white border-slate-200' : 'bg-slate-50 border-slate-100'}`}>
-                    <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide mb-1">Toplam Gerçekleşen</p>
+                    <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide mb-1">Güncel Tahmin</p>
                     <p className={`text-xl font-bold font-mono ${hasActual ? 'text-slate-800' : 'text-slate-300'}`}>
-                        {hasActual ? fmt(summary?.total_actual) : '—'}
+                        {hasActual ? fmt(summary?.blended_total) : '—'}
                     </p>
-                    <p className="text-xs text-slate-400 mt-1">{summary?.completed_count || 0} sözleşmeli</p>
+                    <p className="text-xs text-slate-400 mt-1">
+                        {hasActual
+                            ? `${summary?.contracted_count} gerçek + ${(summary?.total_items || 0) - (summary?.contracted_count || 0)} planlanan`
+                            : 'gerçek fiyat girilince güncellenir'}
+                    </p>
                 </div>
 
                 {/* Fark */}
@@ -721,7 +727,7 @@ export default function CostsPage() {
                     ) : (
                         <>
                             <p className="text-xl font-bold text-slate-300 font-mono">—</p>
-                            <p className="text-xs text-slate-400 mt-1">gerçek fiyat girilince hesaplanır</p>
+                            <p className="text-xs text-slate-400 mt-1">gerçek fiyat girilince güncellenir</p>
                         </>
                     )}
                 </div>

@@ -161,25 +161,32 @@ class CostItemController extends Controller
         $settings = CostSetting::where('project_id', $projectId)->first();
 
         $totalPlanned   = $items->sum('planned_total');
+        // Gerçek toplam: sadece actual_total girilen kalemlerin toplamı
         $totalActual    = $items->whereNotNull('actual_total')->sum('actual_total');
+        // Karma tahmin: actual_total varsa onu, yoksa planned_total kullan → en güncel maliyet tahmini
+        $blendedTotal   = $items->sum(fn($i) => $i->actual_total ?? $i->planned_total ?? 0);
         $unitCount      = $settings?->unit_count ?? 1;
         $plannedPerUnit = $unitCount > 0 ? $totalPlanned / $unitCount : 0;
-        $actualPerUnit  = $unitCount > 0 ? $totalActual / $unitCount : 0;
-        $variance       = $totalActual - $totalPlanned;
+        $actualPerUnit  = $unitCount > 0 ? $blendedTotal / $unitCount : 0;
+        $variance       = $blendedTotal - $totalPlanned;
         $completedCount = $items->where('status', 'contracted')->count()
                         + $items->where('status', 'in_progress')->count()
                         + $items->where('status', 'completed')->count();
 
+        $contractedCount = $items->whereNotNull('actual_total')->count();
+
         return response()->json([
             'data' => [
-                'total_planned'    => $totalPlanned,
-                'total_actual'     => $totalActual,
-                'variance'         => $variance,
-                'unit_count'       => $unitCount,
-                'planned_per_unit' => $plannedPerUnit,
-                'actual_per_unit'  => $actualPerUnit,
-                'total_items'      => $items->count(),
-                'completed_count'  => $completedCount,
+                'total_planned'     => $totalPlanned,
+                'total_actual'      => $totalActual,      // sadece gerçek fiyat girilenlerin toplamı
+                'blended_total'     => $blendedTotal,     // gerçek + kalan planlanan = güncel tahmin
+                'variance'          => $variance,
+                'unit_count'        => $unitCount,
+                'planned_per_unit'  => $plannedPerUnit,
+                'actual_per_unit'   => $actualPerUnit,    // blended / unit_count
+                'total_items'       => $items->count(),
+                'completed_count'   => $completedCount,
+                'contracted_count'  => $contractedCount,
             ]
         ]);
     }
