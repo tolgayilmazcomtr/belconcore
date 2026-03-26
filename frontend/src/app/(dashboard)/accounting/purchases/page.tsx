@@ -117,7 +117,13 @@ export default function PurchasesPage() {
     };
 
     const handlePdf = (inv: Invoice) => {
-        window.open(`${process.env.NEXT_PUBLIC_API_URL}/api/accounting/invoices/${inv.id}/pdf`, '_blank');
+        try {
+            const auth = JSON.parse(localStorage.getItem('auth-storage') || '{}');
+            const token = auth?.state?.token || '';
+            window.open(`${process.env.NEXT_PUBLIC_API_URL}/api/accounting/invoices/${inv.id}/pdf?token=${token}`, '_blank');
+        } catch {
+            window.open(`${process.env.NEXT_PUBLIC_API_URL}/api/accounting/invoices/${inv.id}/pdf`, '_blank');
+        }
     };
 
     const handleDelete = async (inv: Invoice) => {

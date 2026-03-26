@@ -200,8 +200,15 @@ class InvoiceController extends Controller
         return response()->json(['message' => 'Fatura silindi.']);
     }
 
-    public function generatePdf(string $id)
+    public function generatePdf(Request $request, string $id)
     {
+        // Support token via query string for direct browser downloads
+        if ($request->query('token')) {
+            $user = \Laravel\Sanctum\PersonalAccessToken::findToken($request->query('token'))?->tokenable;
+            if (!$user) return response()->json(['message' => 'Unauthorized'], 401);
+            auth()->setUser($user);
+        }
+
         $invoice = Invoice::with(['account', 'items', 'payments', 'project'])->findOrFail($id);
 
         $typeLabel = $invoice->type === 'sales' ? 'SATIŞ FATURASI' : 'ALIŞ FATURASI';

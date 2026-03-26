@@ -148,8 +148,13 @@ export default function SalesPage() {
     };
 
     const handlePdf = (inv: Invoice) => {
-        const url = `${process.env.NEXT_PUBLIC_API_URL}/api/accounting/invoices/${inv.id}/pdf`;
-        window.open(url, '_blank');
+        try {
+            const auth = JSON.parse(localStorage.getItem('auth-storage') || '{}');
+            const token = auth?.state?.token || '';
+            window.open(`${process.env.NEXT_PUBLIC_API_URL}/api/accounting/invoices/${inv.id}/pdf?token=${token}`, '_blank');
+        } catch {
+            window.open(`${process.env.NEXT_PUBLIC_API_URL}/api/accounting/invoices/${inv.id}/pdf`, '_blank');
+        }
     };
 
     const handleDelete = async (inv: Invoice) => {
