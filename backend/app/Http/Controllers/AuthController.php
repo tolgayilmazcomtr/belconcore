@@ -46,4 +46,29 @@ class AuthController extends Controller
             'user' => $request->user()->load('roles')
         ]);
     }
+
+    public function updateProfile(Request $request)
+    {
+        $user = $request->user();
+
+        $validated = $request->validate([
+            'name'                  => 'required|string|max:255',
+            'email'                 => 'required|email|unique:users,email,' . $user->id,
+            'current_password'      => 'nullable|string',
+            'password'              => 'nullable|string|min:8|confirmed',
+        ]);
+
+        if (!empty($validated['password'])) {
+            if (empty($validated['current_password']) || !Hash::check($validated['current_password'], $user->password)) {
+                return response()->json(['message' => 'Mevcut şifre hatalı.'], 422);
+            }
+            $user->password = Hash::make($validated['password']);
+        }
+
+        $user->name  = $validated['name'];
+        $user->email = $validated['email'];
+        $user->save();
+
+        return response()->json(['message' => 'Profil güncellendi.', 'user' => $user->load('roles')]);
+    }
 }
