@@ -66,21 +66,32 @@ export default function DashboardPage() {
         if (!activeProject) { setLoading(false); return; }
         setLoading(true);
         const pid = activeProject.id;
-        Promise.all([
+        Promise.allSettled([
             api.get('/units', { params: { active_project_id: pid, per_page: 1000 } }),
             api.get('/leads', { params: { active_project_id: pid, per_page: 1000 } }),
             api.get('/accounting/invoices', { params: { active_project_id: pid, per_page: 1000, date_from: `${year}-01-01`, date_to: `${year}-12-31` } }),
             api.get('/finance/summary', { params: { active_project_id: pid } }),
             api.get('/finance/transactions', { params: { active_project_id: pid, per_page: 1000, date_from: dateFrom, date_to: dateTo } }),
             api.get('/costs/summary', { params: { active_project_id: pid } }),
-            api.get('/contracts', { params: { active_project_id: pid } }).catch(() => ({ data: { data: [] } })),
+            api.get('/contracts', { params: { active_project_id: pid } }),
         ]).then(([unitsRes, leadsRes, invRes, finSummaryRes, txRes, costRes, contractsRes]) => {
-            const units: any[] = Array.isArray(unitsRes.data) ? unitsRes.data : (unitsRes.data?.data || []);
-            const leads: any[] = Array.isArray(leadsRes.data) ? leadsRes.data : (leadsRes.data?.data || []);
-            const invoices: any[] = invRes.data?.data || [];
-            const finSummary = finSummaryRes.data || {};
-            const txs: any[] = txRes.data?.data || [];
-            const costSummary = costRes.data?.data || costRes.data || {};
+            const val = (r: PromiseSettledResult<any>) => r.status === 'fulfilled' ? r.value : null;
+
+            const unitsData = val(unitsRes);
+            const units: any[] = Array.isArray(unitsData?.data) ? unitsData.data : (unitsData?.data?.data || []);
+
+            const leadsData = val(leadsRes);
+            const leads: any[] = Array.isArray(leadsData?.data) ? leadsData.data : (leadsData?.data?.data || []);
+
+            const invData = val(invRes);
+            const invoices: any[] = invData?.data?.data || [];
+
+            const finSummary = val(finSummaryRes)?.data || {};
+            const txData = val(txRes);
+            const txs: any[] = txData?.data?.data || [];
+
+            const costData = val(costRes);
+            const costSummary = costData?.data?.data || costData?.data || {};
 
             const unitStats = {
                 available: units.filter(u => u.status === 'available').length,
@@ -106,11 +117,12 @@ export default function DashboardPage() {
                 payable: purInv.reduce((s, i) => s + (i.remaining || 0), 0),
             };
 
-            const balance = finSummary.data?.total_balance ?? finSummary.total_balance ?? 0;
+            const balance = finSummary?.data?.total_balance ?? finSummary?.total_balance ?? 0;
             const incomeMonth = txs.filter((t: any) => t.type === 'income').reduce((s: number, t: any) => s + t.amount, 0);
             const expenseMonth = txs.filter((t: any) => t.type === 'expense').reduce((s: number, t: any) => s + t.amount, 0);
 
-            const allContracts: any[] = contractsRes.data?.data || [];
+            const contractsData = val(contractsRes);
+            const allContracts: any[] = contractsData?.data?.data || [];
             const today = new Date();
             const in30 = new Date(today.getTime() + 30 * 86400000);
             const allInst = allContracts.flatMap((c: any) => (c.installments || []).map((i: any) => ({ ...i, contractTitle: c.title, counterparty: c.counterparty })));
@@ -138,7 +150,7 @@ export default function DashboardPage() {
                     items: [...overdue, ...upcoming30].sort((a, b) => new Date(a.due_date).getTime() - new Date(b.due_date).getTime()).slice(0, 8),
                 },
             });
-        }).catch(console.error).finally(() => setLoading(false));
+        }).finally(() => setLoading(false));
     }, [activeProject]);
 
     if (!activeProject) {
@@ -151,7 +163,7 @@ export default function DashboardPage() {
         );
     }
 
-    if (loading || !stats) {
+    if (loading) {
         return (
             <div className="p-4 sm:p-6 space-y-4 sm:space-y-6 animate-pulse">
                 <div className="h-6 bg-slate-100 rounded w-48" />
@@ -161,7 +173,15 @@ export default function DashboardPage() {
         );
     }
 
-    const { units, leads, invoices, finance, costs, contracts } = stats;
+    const defaultStats: Stats = {
+        units: { available: 0, reserved: 0, sold: 0, not_for_sale: 0, total: 0 },
+        leads: { total: 0, new: 0, negotiating: 0, won: 0 },
+        invoices: { salesTotal: 0, purchasesTotal: 0, receivable: 0, payable: 0 },
+        finance: { balance: 0, incomeMonth: 0, expenseMonth: 0 },
+        costs: { planned: 0, blended: 0, perUnitPlanned: 0, perUnitBlended: 0, unitCount: 0 },
+        contracts: { overdueCount: 0, overdueAmount: 0, upcomingCount: 0, upcomingAmount: 0, items: [] },
+    };
+    const { units, leads, invoices, finance, costs, contracts } = stats ?? defaultStats;
     const costVariance = costs.blended - costs.planned;
     const costVariancePct = costs.planned > 0 ? ((costVariance / costs.planned) * 100) : 0;
     const soldRevenue = invoices.salesTotal;
