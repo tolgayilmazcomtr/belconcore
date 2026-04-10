@@ -104,6 +104,19 @@ export default function ThreeDViewer() {
     // Persist camera position across Three.js scene rebuilds
     const camStateRef = useRef({ theta: -Math.PI * 0.75, phi: 0.75, r: 26, tx: 0, ty: 3, tz: 0 });
 
+    // Toggle: show/hide owner names on 3D cubes
+    const [showOwnerNames, setShowOwnerNames] = useState(true);
+    const showOwnerNamesRef = useRef(true);
+
+    const toggleOwnerNames = () => {
+        showOwnerNamesRef.current = !showOwnerNamesRef.current;
+        setShowOwnerNames(showOwnerNamesRef.current);
+        // Refresh all unit labels in the Three.js scene
+        if (threeRef.current) {
+            Object.keys(data).forEach(id => threeRef.current?.refreshUnitLabel(id));
+        }
+    };
+
     // Load blocks + units dynamically
     useEffect(() => {
         if (!activeProject) { setIsFetching(false); return; }
@@ -311,7 +324,7 @@ export default function ThreeDViewer() {
         }
 
         function makeLabel(id: string, owner?: string, status?: Status) {
-            const showOwner = status === 'sold' && !!owner;
+            const showOwner = status === 'sold' && !!owner && showOwnerNamesRef.current;
             const cvs2 = document.createElement('canvas');
             cvs2.width = 256; cvs2.height = 64;
             const ctx = cvs2.getContext('2d')!;
@@ -1173,6 +1186,13 @@ export default function ThreeDViewer() {
 
                     {/* View Buttons */}
                     <div className="absolute top-3 right-3 flex flex-col md:flex-row flex-wrap gap-1.5 justify-end z-10 max-w-[150px] md:max-w-[400px]">
+                        <button
+                            onClick={toggleOwnerNames}
+                            title={showOwnerNames ? 'Müşteri isimlerini gizle' : 'Müşteri isimlerini göster'}
+                            className={`flex items-center gap-1 px-2 md:px-3 py-1 md:py-1.5 text-[8px] md:text-[9px] tracking-[1.5px] uppercase rounded-[3px] border shadow-sm transition-colors ${showOwnerNames ? 'bg-[#C8102E] border-[#C8102E] text-white' : 'bg-white/90 border-[#DDE1E7] text-[#8892A0] hover:text-[#C8102E] hover:border-[#C8102E]'}`}
+                        >
+                            {showOwnerNames ? '👁 İsimler Açık' : '🙈 İsimler Kapalı'}
+                        </button>
                         {[
                             { id: 'n', label: "Kuzey'den" },
                             { id: 's', label: "Güney'den" },
@@ -1270,7 +1290,7 @@ export default function ThreeDViewer() {
                                 <div className="w-2 h-2 rounded-sm shrink-0" style={{ backgroundColor: SC_CSS[u.status] }}></div>
                                 <div className="text-[10px] font-bold tracking-[1px] min-w-[55px]">{u.id}</div>
                                 <div className="flex-1 min-w-0">
-                                    <div className="text-[10px] text-[#444] whitespace-nowrap overflow-hidden text-ellipsis">{u.owner || '—'}</div>
+                                    <div className="text-[10px] text-[#444] whitespace-nowrap overflow-hidden text-ellipsis">{showOwnerNames ? (u.owner || '—') : '—'}</div>
                                     <div className="text-[8px] tracking-[1px] uppercase mt-0.5" style={{ color: SC_CSS[u.status] }}>{SL[u.status]}</div>
                                 </div>
                             </div>
@@ -1290,8 +1310,8 @@ export default function ThreeDViewer() {
                         <div className="text-[8px] md:text-[9px] tracking-[1.5px] uppercase" style={{ color: SC_CSS[data[hoverId].status] }}>{SL[data[hoverId].status]}</div>
                         <div className="text-[#8892A0] text-[8px] md:text-[10px] mt-1.5 leading-[1.6]">
                             {data[hoverId].cephe}<br />
-                            {data[hoverId].owner && <>Alıcı: <span className="text-[#444]">{data[hoverId].owner}</span><br /></>}
-                            {data[hoverId].phone && <>Tel: <span className="text-[#444]">{data[hoverId].phone}</span><br /></>}
+                            {showOwnerNames && data[hoverId].owner && <>Alıcı: <span className="text-[#444]">{data[hoverId].owner}</span><br /></>}
+                            {showOwnerNames && data[hoverId].phone && <>Tel: <span className="text-[#444]">{data[hoverId].phone}</span><br /></>}
                             {data[hoverId].note && <>Not: <span className="text-[#444]">{data[hoverId].note}</span></>}
                         </div>
                     </>
