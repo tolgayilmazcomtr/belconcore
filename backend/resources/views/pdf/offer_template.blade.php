@@ -107,6 +107,32 @@
             line-height: 1.55;
         }
 
+        /* ── Payment plan table ─────────────────────────────── */
+        .pay-table { width: 100%; border-collapse: collapse; margin-bottom: 3mm; }
+        .pay-table th {
+            background: #1e3a5f; color: #fff;
+            font-size: 7pt; font-weight: 600;
+            text-transform: uppercase; letter-spacing: 0.04em;
+            padding: 3pt 6pt; text-align: left;
+        }
+        .pay-table th.r, .pay-table td.r { text-align: right; }
+        .pay-table td {
+            padding: 3.5pt 6pt; font-size: 7.5pt;
+            color: #334155; border-bottom: 1px solid #f1f5f9;
+        }
+        .pay-table tr.alt td { background: #f8fafc; }
+        .pay-table tr.pay-total td {
+            background: #e2e8f0; font-weight: 700;
+            font-size: 8pt; color: #0f172a;
+            border-top: 1.5px solid #94a3b8; border-bottom: none;
+        }
+        .pay-table .inf-badge { color: #d97706; font-size: 6.5pt; }
+        .pay-inflation-note {
+            font-size: 6.5pt; color: #78716c;
+            border: 1px solid #fde68a; background: #fffbeb;
+            padding: 2mm 3mm; margin-bottom: 3mm;
+        }
+
         /* ── Signature (3 cols via table) ────────────────────── */
         .sig-table { width: 100%; border-collapse: separate; border-spacing: 6mm 0; margin-top: 8mm; }
         .sig-td { width: 33%; vertical-align: bottom; }
@@ -235,8 +261,72 @@
 
     {{-- ══ ÖDEME PLANI ════════════════════════════════════════════ --}}
     @if($offer->payment_plan)
+    @php
+        $planData = null;
+        $decoded = json_decode($offer->payment_plan, true);
+        if (is_array($decoded) && isset($decoded['items']) && count($decoded['items']) > 0) {
+            $planData = $decoded;
+        }
+        $typeLabels = [
+            'downpayment_only'   => 'Tam Peşin',
+            'lump_sum'           => 'Tek Seferlik',
+            'equal_installments' => 'Eşit Taksitli',
+            'fixed_amount'       => 'Sabit Tutarlı',
+            'custom'             => 'Özel Plan',
+        ];
+    @endphp
+
     <div class="section-title">Ödeme Planı</div>
-    <div class="text-block">{{ $offer->payment_plan }}</div>
+
+    @if($planData)
+        @php
+            $annualRate = round((pow(1 + $planData['monthly_inflation_rate'] / 100, 12) - 1) * 100, 1);
+            $typeLabel  = $typeLabels[$planData['type']] ?? $planData['type'];
+        @endphp
+        <div class="pay-inflation-note">
+            Plan Tipi: <strong>{{ $typeLabel }}</strong> &nbsp;|&nbsp;
+            Aylık Enflasyon: <strong>%{{ $planData['monthly_inflation_rate'] }}</strong> &nbsp;|&nbsp;
+            Yıllık: <strong>~%{{ $annualRate }}</strong> &nbsp;|&nbsp;
+            Teklif Tarihi: <strong>{{ \Carbon\Carbon::parse($planData['offer_date'])->format('d.m.Y') }}</strong>
+        </div>
+        <table class="pay-table">
+            <thead>
+                <tr>
+                    <th style="width:5%">#</th>
+                    <th style="width:28%">Açıklama</th>
+                    <th style="width:20%">Ödeme Tarihi</th>
+                    <th class="r" style="width:22%">Bugünkü Değer</th>
+                    <th class="r" style="width:25%">Ödenecek Tutar</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach($planData['items'] as $idx => $item)
+                <tr class="{{ $idx % 2 === 1 ? 'alt' : '' }}">
+                    <td>{{ $item['no'] }}</td>
+                    <td><strong>{{ $item['description'] }}</strong></td>
+                    <td>{{ $item['date'] }}</td>
+                    <td class="r">{{ number_format($item['real_amount'], 0, ',', '.') }} ₺</td>
+                    <td class="r">
+                        <strong>{{ number_format($item['nominal_amount'], 0, ',', '.') }} ₺</strong>
+                        @if($item['month_offset'] > 0)
+                            @php $pct = round(($item['nominal_amount'] / max($item['real_amount'], 1) - 1) * 100, 1); @endphp
+                            <span class="inf-badge"> (+%{{ $pct }})</span>
+                        @endif
+                    </td>
+                </tr>
+                @endforeach
+            </tbody>
+            <tfoot>
+                <tr class="pay-total">
+                    <td colspan="3">TOPLAM</td>
+                    <td class="r">{{ number_format($planData['total_real'], 0, ',', '.') }} ₺</td>
+                    <td class="r">{{ number_format($planData['total_nominal'], 0, ',', '.') }} ₺</td>
+                </tr>
+            </tfoot>
+        </table>
+    @else
+        <div class="text-block">{{ $offer->payment_plan }}</div>
+    @endif
     @endif
 
     {{-- ══ NOTLAR ══════════════════════════════════════════════ --}}

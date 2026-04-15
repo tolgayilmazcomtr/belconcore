@@ -18,6 +18,7 @@ import { useCrmStore } from '@/store/useCrmStore';
 import { useProjectStore } from '@/store/useProjectStore';
 import { Calculator, Plus, Search, UserPlus, X, ChevronDown } from 'lucide-react';
 import { Offer } from '@/types/project.types';
+import { PaymentPlanBuilder } from './PaymentPlanBuilder';
 
 // ─── Quick customer add modal ─────────────────────────────────────────
 
@@ -382,14 +383,77 @@ export function StandaloneOfferCreateModal({ trigger, onSuccess }: StandaloneOff
                                         <SelectTrigger><SelectValue placeholder="Birim Seçin (Opsiyonel)" /></SelectTrigger>
                                         <SelectContent>
                                             <SelectItem value="none" className="text-slate-400 italic">Seçilmedi</SelectItem>
-                                            {units?.map(u => (
+                                            {/* Available units first */}
+                                            {units.filter(u => u.status === 'available').length > 0 && (
+                                                <div className="px-2 py-1 text-xs font-semibold text-emerald-600 bg-emerald-50">Satışa Açık</div>
+                                            )}
+                                            {units.filter(u => u.status === 'available').map(u => (
                                                 <SelectItem key={u.id} value={u.id.toString()}>
-                                                    {(u as { block?: { name?: string } }).block?.name} - No: {u.unit_no}
-                                                    {u.list_price ? ` (${Number(u.list_price).toLocaleString('tr-TR')} ₺)` : ''}
+                                                    <span className="flex items-center gap-2">
+                                                        <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0 inline-block" />
+                                                        {(u as { block?: { name?: string } }).block?.name} - No: {u.unit_no}
+                                                        {u.unit_type ? ` · ${u.unit_type}` : ''}
+                                                        {u.list_price ? ` · ${Number(u.list_price).toLocaleString('tr-TR')} ₺` : ''}
+                                                    </span>
+                                                </SelectItem>
+                                            ))}
+                                            {/* Reserved units */}
+                                            {units.filter(u => u.status === 'reserved').length > 0 && (
+                                                <div className="px-2 py-1 text-xs font-semibold text-amber-600 bg-amber-50">Rezerve</div>
+                                            )}
+                                            {units.filter(u => u.status === 'reserved').map(u => (
+                                                <SelectItem key={u.id} value={u.id.toString()} className="text-amber-700">
+                                                    <span className="flex items-center gap-2">
+                                                        <span className="w-2 h-2 rounded-full bg-amber-400 shrink-0 inline-block" />
+                                                        {(u as { block?: { name?: string } }).block?.name} - No: {u.unit_no}
+                                                        {u.unit_type ? ` · ${u.unit_type}` : ''}
+                                                        {u.list_price ? ` · ${Number(u.list_price).toLocaleString('tr-TR')} ₺` : ''}
+                                                    </span>
+                                                </SelectItem>
+                                            ))}
+                                            {/* Sold units */}
+                                            {units.filter(u => u.status === 'sold').length > 0 && (
+                                                <div className="px-2 py-1 text-xs font-semibold text-red-500 bg-red-50">Satıldı</div>
+                                            )}
+                                            {units.filter(u => u.status === 'sold').map(u => (
+                                                <SelectItem key={u.id} value={u.id.toString()} className="text-slate-400">
+                                                    <span className="flex items-center gap-2">
+                                                        <span className="w-2 h-2 rounded-full bg-red-400 shrink-0 inline-block" />
+                                                        {(u as { block?: { name?: string } }).block?.name} - No: {u.unit_no}
+                                                        {u.unit_type ? ` · ${u.unit_type}` : ''}
+                                                        <span className="text-xs line-through">Satıldı</span>
+                                                    </span>
+                                                </SelectItem>
+                                            ))}
+                                            {/* Not for sale */}
+                                            {units.filter(u => u.status === 'not_for_sale').map(u => (
+                                                <SelectItem key={u.id} value={u.id.toString()} className="text-slate-300" disabled>
+                                                    <span className="flex items-center gap-2">
+                                                        <span className="w-2 h-2 rounded-full bg-slate-300 shrink-0 inline-block" />
+                                                        {(u as { block?: { name?: string } }).block?.name} - No: {u.unit_no} · Satışa Kapalı
+                                                    </span>
                                                 </SelectItem>
                                             ))}
                                         </SelectContent>
                                     </Select>
+                                    {/* Selected unit status badge */}
+                                    {formData.unit_id && formData.unit_id !== 'none' && (() => {
+                                        const sel = units.find(u => u.id.toString() === formData.unit_id);
+                                        if (!sel) return null;
+                                        const cfg: Record<string, { label: string; cls: string }> = {
+                                            available: { label: 'Satışa Açık', cls: 'bg-emerald-100 text-emerald-700 border-emerald-300' },
+                                            reserved: { label: 'Rezerve', cls: 'bg-amber-100 text-amber-700 border-amber-300' },
+                                            sold: { label: 'Satıldı', cls: 'bg-red-100 text-red-600 border-red-300' },
+                                            maintenance: { label: 'Bakımda', cls: 'bg-slate-100 text-slate-500 border-slate-300' },
+                                            not_for_sale: { label: 'Satışa Kapalı', cls: 'bg-slate-100 text-slate-400 border-slate-200' },
+                                        };
+                                        const c = cfg[sel.status] ?? cfg.not_for_sale;
+                                        return (
+                                            <span className={`inline-flex items-center text-xs px-2 py-0.5 rounded-full border font-medium ${c.cls}`}>
+                                                {c.label}
+                                            </span>
+                                        );
+                                    })()}
                                 </div>
 
                                 <div className="grid grid-cols-2 gap-3">
@@ -446,12 +510,12 @@ export function StandaloneOfferCreateModal({ trigger, onSuccess }: StandaloneOff
                             </div>
                         </div>
 
-                        <div className="space-y-1.5">
-                            <Label>Ödeme Planı</Label>
-                            <Textarea rows={3} value={formData.payment_plan}
-                                onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setFormData(p => ({ ...p, payment_plan: e.target.value }))}
-                                placeholder="Örn: %50 Peşin, %50 teslimde..." />
-                        </div>
+                        <PaymentPlanBuilder
+                            finalPrice={parseFloat(formData.final_price) || 0}
+                            offerDate={new Date().toISOString().split('T')[0]}
+                            value={formData.payment_plan}
+                            onChange={v => setFormData(p => ({ ...p, payment_plan: v }))}
+                        />
 
                         <div className="space-y-1.5">
                             <Label>Özel Notlar</Label>

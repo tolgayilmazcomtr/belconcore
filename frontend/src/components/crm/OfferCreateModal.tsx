@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Offer, Lead, Customer, Unit } from '@/types/project.types';
+import { Offer, Lead, Unit } from '@/types/project.types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -25,7 +25,8 @@ import api from '@/lib/api';
 import { toast } from 'sonner';
 import { useCrmStore } from '@/store/useCrmStore';
 import { useProjectStore } from '@/store/useProjectStore';
-import { Calculator, FileText, Plus } from 'lucide-react';
+import { Calculator, FileText } from 'lucide-react';
+import { PaymentPlanBuilder } from './PaymentPlanBuilder';
 
 interface OfferCreateModalProps {
     lead: Lead;
@@ -191,13 +192,54 @@ export function OfferCreateModal({ lead, editOffer, trigger, onSuccess }: OfferC
                                     </SelectTrigger>
                                     <SelectContent>
                                         <SelectItem value="none" className="text-slate-400 italic">Birim Seçilmedi</SelectItem>
-                                        {units.map(u => (
+                                        {units.filter(u => u.status === 'available').length > 0 && (
+                                            <div className="px-2 py-1 text-xs font-semibold text-emerald-600 bg-emerald-50">Satışa Açık</div>
+                                        )}
+                                        {units.filter(u => u.status === 'available').map(u => (
                                             <SelectItem key={u.id} value={u.id.toString()}>
-                                                {(u as any).block?.name} - No: {u.unit_no} {u.list_price ? `(Liste: ${u.list_price} ₺)` : ''}
+                                                <span className="flex items-center gap-2">
+                                                    <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block shrink-0" />
+                                                    {(u as any).block?.name} - No: {u.unit_no}{u.unit_type ? ` · ${u.unit_type}` : ''}{u.list_price ? ` · ${Number(u.list_price).toLocaleString('tr-TR')} ₺` : ''}
+                                                </span>
+                                            </SelectItem>
+                                        ))}
+                                        {units.filter(u => u.status === 'reserved').length > 0 && (
+                                            <div className="px-2 py-1 text-xs font-semibold text-amber-600 bg-amber-50">Rezerve</div>
+                                        )}
+                                        {units.filter(u => u.status === 'reserved').map(u => (
+                                            <SelectItem key={u.id} value={u.id.toString()} className="text-amber-700">
+                                                <span className="flex items-center gap-2">
+                                                    <span className="w-2 h-2 rounded-full bg-amber-400 inline-block shrink-0" />
+                                                    {(u as any).block?.name} - No: {u.unit_no}{u.unit_type ? ` · ${u.unit_type}` : ''}{u.list_price ? ` · ${Number(u.list_price).toLocaleString('tr-TR')} ₺` : ''}
+                                                </span>
+                                            </SelectItem>
+                                        ))}
+                                        {units.filter(u => u.status === 'sold').length > 0 && (
+                                            <div className="px-2 py-1 text-xs font-semibold text-red-500 bg-red-50">Satıldı</div>
+                                        )}
+                                        {units.filter(u => u.status === 'sold').map(u => (
+                                            <SelectItem key={u.id} value={u.id.toString()} className="text-slate-400">
+                                                <span className="flex items-center gap-2">
+                                                    <span className="w-2 h-2 rounded-full bg-red-400 inline-block shrink-0" />
+                                                    {(u as any).block?.name} - No: {u.unit_no} · <span className="line-through text-xs">Satıldı</span>
+                                                </span>
                                             </SelectItem>
                                         ))}
                                     </SelectContent>
                                 </Select>
+                                {formData.unit_id && formData.unit_id !== 'none' && (() => {
+                                    const sel = units.find(u => u.id.toString() === formData.unit_id);
+                                    if (!sel) return null;
+                                    const cfg: Record<string, { label: string; cls: string }> = {
+                                        available: { label: 'Satışa Açık', cls: 'bg-emerald-100 text-emerald-700 border-emerald-300' },
+                                        reserved: { label: 'Rezerve', cls: 'bg-amber-100 text-amber-700 border-amber-300' },
+                                        sold: { label: 'Satıldı', cls: 'bg-red-100 text-red-600 border-red-300' },
+                                        maintenance: { label: 'Bakımda', cls: 'bg-slate-100 text-slate-500 border-slate-300' },
+                                        not_for_sale: { label: 'Satışa Kapalı', cls: 'bg-slate-100 text-slate-400 border-slate-200' },
+                                    };
+                                    const c = cfg[sel.status] ?? cfg.not_for_sale;
+                                    return <span className={`inline-flex items-center text-xs px-2 py-0.5 rounded-full border font-medium mt-1 ${c.cls}`}>{c.label}</span>;
+                                })()}
                             </div>
 
                             <div className="grid grid-cols-2 gap-4">
@@ -281,15 +323,12 @@ export function OfferCreateModal({ lead, editOffer, trigger, onSuccess }: OfferC
                         </div>
                     </div>
 
-                    <div className="space-y-2">
-                        <Label>Ödeme Planı</Label>
-                        <Textarea
-                            value={formData.payment_plan}
-                            onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setFormData({ ...formData, payment_plan: e.target.value })}
-                            placeholder="Örn: %50 Peşin, geri kalanı 12 ay vadeli..."
-                            rows={3}
-                        />
-                    </div>
+                    <PaymentPlanBuilder
+                        finalPrice={parseFloat(formData.final_price) || 0}
+                        offerDate={new Date().toISOString().split('T')[0]}
+                        value={formData.payment_plan}
+                        onChange={v => setFormData(prev => ({ ...prev, payment_plan: v }))}
+                    />
 
                     <div className="space-y-2">
                         <Label>Özel Notlar (PDF'te Görünür)</Label>
