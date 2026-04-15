@@ -218,7 +218,8 @@ html, body {
                     $alanStr   = '';
                     if ($u->net_area)   $alanStr .= $u->net_area . ' m2 net';
                     if ($u->gross_area) $alanStr .= ($alanStr ? ' / ' : '') . $u->gross_area . ' m2 brut';
-                    $katStr = ($u->floor_no !== null && $u->floor_no !== '') ? $u->floor_no . '. Kat' : null;
+                    $katRaw = ($u->floor_no !== null && $u->floor_no !== '') ? (string)$u->floor_no : null;
+                    $katStr = $katRaw ? (stripos($katRaw, 'kat') !== false ? $katRaw : $katRaw . '. Kat') : null;
                 @endphp
                 <table class="kv"><tr><td class="k">Konut</td><td class="v">{{ $unitLabel }}</td></tr></table>
                 @if($u->unit_type)
