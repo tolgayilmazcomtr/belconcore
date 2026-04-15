@@ -88,11 +88,9 @@ class OfferController extends Controller
 
         $pdf = Pdf::loadView('pdf.offer_template', ['offer' => $offerModel])
             ->setOptions([
-                'defaultFont'             => 'DejaVu Sans',
-                'isFontSubsettingEnabled' => false,   // tam unicode — Türkçe karakter desteği
-                'isHtml5ParserEnabled'    => true,
-                'isRemoteEnabled'         => false,
-                'dpi'                     => 150,
+                'defaultFont'          => 'DejaVu Sans',
+                'isHtml5ParserEnabled' => true,
+                'isRemoteEnabled'      => false,
             ])
             ->setPaper('A4', 'portrait');
 
