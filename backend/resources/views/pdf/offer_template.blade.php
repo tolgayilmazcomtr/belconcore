@@ -5,7 +5,7 @@
 <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
 <title>Teklif</title>
 <style>
-@page { margin: 10mm 19mm 10mm 19mm; }
+@page { margin: 6mm 3mm 3mm 3mm; }
 * { margin:0; padding:0; }
 html, body {
     font-family: 'DejaVu Sans', sans-serif;
@@ -33,24 +33,24 @@ html, body {
 .sa { color:#057a55; border-color:#6ee7b7; background:#ecfdf5; }
 .sr { color:#b91c1c; border-color:#fca5a5; background:#fef2f2; }
 
-.rule { border:none; border-top:2px solid #C8102E; margin:4mm 0; }
+.rule { border:none; border-top:2px solid #C8102E; margin:3mm 0; }
 
 /* ── META ── */
-.meta { width:100%; border-collapse:collapse; margin-bottom:4mm; }
+.meta { width:100%; border-collapse:collapse; margin-bottom:3mm; }
 .meta > tr > td { vertical-align:top; padding:0; }
-.ml { width:84mm; padding-right:6mm; border-right:1px solid #e8e8e8; }
-.mr { width:84mm; padding-left:6mm; }
-.sec  { font-size:5.5pt; font-weight:700; color:#999; letter-spacing:0.14em; text-transform:uppercase; margin-bottom:3px; }
+.ml { width:84mm; padding-right:5mm; border-right:1px solid #e8e8e8; }
+.mr { width:84mm; padding-left:5mm; }
+.sec  { font-size:5pt; font-weight:700; color:#999; letter-spacing:0.14em; text-transform:uppercase; margin-bottom:2px; }
 .kv   { width:100%; border-collapse:collapse; }
-.kv td{ font-size:7.5pt; padding:0.8px 0; vertical-align:top; }
-.k    { color:#888; width:58px; }
+.kv td{ font-size:7pt; padding:0.4px 0; vertical-align:top; }
+.k    { color:#888; width:56px; }
 .v    { color:#111; font-weight:600; }
 .vred { color:#C8102E; font-weight:700; }
 
 /* ── SECTION HEAD ── */
 .sh {
     font-size:5.5pt; font-weight:700; color:#888; letter-spacing:0.14em; text-transform:uppercase;
-    border-bottom:1px solid #e4e4e4; padding-bottom:2px; margin:4mm 0 2.5mm 0;
+    border-bottom:1px solid #e4e4e4; padding-bottom:1.5px; margin:3mm 0 2mm 0;
 }
 
 /* ── FİYAT TABLOSU ── */
