@@ -87,22 +87,22 @@ body {
 .txt { font-size:7.5pt; color:#444; line-height:1.55; border-left:2px solid #ddd; padding:0 0 0 3mm; margin-bottom:2.5mm; }
 
 /* ── YASAL ── */
-.legal { font-size:5.5pt; color:#bbb; line-height:1.55; border-top:1px solid #f0f0f0; padding-top:2mm; margin-top:3.5mm; }
+.legal { font-size:5.5pt; color:#bbb; line-height:1.45; border-top:1px solid #f0f0f0; padding-top:1.5mm; margin-top:2.5mm; }
 
 /* ── İMZA ── */
-.sig { width:100%; border-collapse:collapse; margin-top:6mm; }
+.sig { width:100%; border-collapse:collapse; margin-top:3mm; }
 .sig td { width:33%; vertical-align:bottom; padding:0 3mm 0 0; }
 .sig td:last-child { padding-right:0; }
-.sline { border-top:1px solid #ccc; padding-top:3px; margin-top:13mm; }
+.sline { border-top:1px solid #ccc; padding-top:3px; margin-top:8mm; }
 .sname { font-size:7pt; font-weight:700; color:#333; }
 .srole { font-size:5.5pt; color:#bbb; margin-top:1px; }
 
 /* ── FOOTER ── */
-.ft { width:100%; border-collapse:collapse; border-top:1px solid #e0e0e0; margin-top:5mm; }
-.ft td { padding-top:2.5mm; font-size:5.5pt; color:#bbb; line-height:1.6; vertical-align:top; }
-.fb { font-size:6.5pt; font-weight:700; color:#111; margin-bottom:1px; }
+.ft { width:100%; border-collapse:collapse; border-top:1px solid #e0e0e0; margin-top:3mm; padding-top:0; }
+.ft td { padding-top:1.5mm; font-size:5.5pt; color:#bbb; line-height:1.4; vertical-align:middle; }
+.fb { font-size:5.5pt; font-weight:700; color:#111; display:inline; }
 .fr { text-align:right; }
-.fn { color:#C8102E; font-weight:700; font-size:6pt; }
+.fn { color:#C8102E; font-weight:700; font-size:5.5pt; }
 </style>
 </head>
 <body>
@@ -408,20 +408,24 @@ body {
 </table>
 
 {{-- FOOTER --}}
+@php
+    $footerParts = [];
+    if ($proj) {
+        $footerParts[] = '<strong>' . e($proj->company_name ?? $proj->name) . '</strong>';
+        if ($proj->company_address) $footerParts[] = e($proj->company_address);
+        if ($proj->company_phone)   $footerParts[] = 'Tel: ' . e($proj->company_phone);
+        if ($proj->company_email)   $footerParts[] = e($proj->company_email);
+        if ($proj->tax_number)      $footerParts[] = 'VKN: ' . e($proj->tax_number) . ($proj->tax_office ? ' / ' . e($proj->tax_office) : '');
+    }
+    $footerLeft = implode(' &nbsp;|&nbsp; ', $footerParts);
+@endphp
 <table class="ft">
 <tr>
-  <td style="width:60%">
-    @if($proj)
-      <div class="fb">{{ $proj->company_name ?? $proj->name }}</div>
-      @if($proj->company_address)<div>{{ $proj->company_address }}</div>@endif
-      @if($proj->company_phone)<div>Tel: {{ $proj->company_phone }}{{ $proj->company_email ? '  |  '.$proj->company_email : '' }}</div>@endif
-      @if($proj->tax_number)<div>VKN: {{ $proj->tax_number }}{{ $proj->tax_office ? ' / '.$proj->tax_office : '' }}</div>@endif
-    @endif
-  </td>
-  <td class="fr" style="width:40%">
-    <div class="fn">{{ $offer->offer_no }}</div>
-    <div>{{ now()->format('d.m.Y H:i') }}</div>
-    <div>Elektronik ortamda uretilmistir.</div>
+  <td style="width:68%">{!! $footerLeft !!}</td>
+  <td class="fr" style="width:32%">
+    <span class="fn">{{ $offer->offer_no }}</span>
+    &nbsp;&middot;&nbsp; {{ now()->format('d.m.Y') }}
+    &nbsp;&middot;&nbsp; Elektronik ortamda uretilmistir.
   </td>
 </tr>
 </table>
