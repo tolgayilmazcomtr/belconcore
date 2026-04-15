@@ -5,7 +5,7 @@
 <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
 <title>Teklif</title>
 <style>
-@page { margin: 10mm 19mm; }
+@page { margin: 10mm 19mm 10mm 19mm; }
 * { margin:0; padding:0; }
 html, body {
     font-family: 'DejaVu Sans', sans-serif;
@@ -13,8 +13,10 @@ html, body {
     color: #1a1a1a;
     background: #fff;
     line-height: 1.4;
+    margin: 0;
+    padding: 0;
 }
-.page { width:172mm; }
+.page { width:100%; }
 
 /* ── HEADER ── */
 .hdr { width:100%; border-collapse:collapse; }
