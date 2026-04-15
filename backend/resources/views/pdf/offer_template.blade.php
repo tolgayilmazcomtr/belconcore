@@ -5,6 +5,7 @@
 <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
 <title>Teklif</title>
 <style>
+@page { margin: 10mm 19mm; }
 * { margin:0; padding:0; }
 html, body {
     font-family: 'DejaVu Sans', sans-serif;
@@ -13,7 +14,7 @@ html, body {
     background: #fff;
     line-height: 1.4;
 }
-.page { width:172mm; margin:10mm 19mm; }
+.page { width:172mm; }
 
 /* ── HEADER ── */
 .hdr { width:100%; border-collapse:collapse; }
@@ -104,6 +105,11 @@ html, body {
     $coName   = ($proj && $proj->company_name) ? $proj->company_name : ($proj->name ?? 'Belcon');
     $logoPath = ($proj && $proj->logo_path) ? storage_path('app/public/' . $proj->logo_path) : null;
     $hasLogo  = $logoPath && file_exists($logoPath);
+    $logoSrc  = null;
+    if ($hasLogo) {
+        $mime = mime_content_type($logoPath);
+        $logoSrc = 'data:' . $mime . ';base64,' . base64_encode(file_get_contents($logoPath));
+    }
 
     $sm = ['draft'=>['TASLAK','sd'],'sent'=>['GONDER&#304;LD&#304;','ss'],'accepted'=>['KABUL ED&#304;LD&#304;','sa'],'rejected'=>['REDDEDD&#304;LD&#304;','sr']];
     $sLabel = $sm[$offer->status][0] ?? strtoupper($offer->status);
@@ -143,8 +149,8 @@ html, body {
 <table class="hdr">
 <tr>
   <td style="width:55%">
-    @if($hasLogo)
-      <img src="{{ $logoPath }}" class="logo-img" alt="{{ $coName }}">
+    @if($hasLogo && $logoSrc)
+      <img src="{{ $logoSrc }}" class="logo-img" alt="{{ $coName }}">
     @else
       <div class="co-name">{{ $coName }}</div>
       <div class="co-sub">Gayrimenkul &amp; Insaat</div>
