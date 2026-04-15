@@ -5,16 +5,22 @@
 <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
 <title>Teklif</title>
 <style>
-@page { margin: 6mm 3mm 3mm 3mm; }
+@page {
+    margin-top: 6mm;
+    margin-right: 3mm;
+    margin-bottom: 3mm;
+    margin-left: 3mm;
+}
 * { margin:0; padding:0; }
-html, body {
+html {
     font-family: 'DejaVu Sans', sans-serif;
     font-size: 8pt;
     color: #1a1a1a;
     background: #fff;
     line-height: 1.4;
-    margin: 0;
-    padding: 0;
+}
+body {
+    margin: 6mm 3mm 3mm 3mm;
 }
 .page { width:100%; }
 
