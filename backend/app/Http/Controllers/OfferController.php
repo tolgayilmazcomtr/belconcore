@@ -86,8 +86,15 @@ class OfferController extends Controller
             abort(403, 'Bu teklife erişim yetkiniz bulunmuyor.');
         }
 
-        $pdf = Pdf::loadView('pdf.offer_template', ['offer' => $offerModel]);
-        $pdf->setPaper('A4', 'portrait');
+        $pdf = Pdf::loadView('pdf.offer_template', ['offer' => $offerModel])
+            ->setOptions([
+                'defaultFont'             => 'DejaVu Sans',
+                'isFontSubsettingEnabled' => false,   // tam unicode — Türkçe karakter desteği
+                'isHtml5ParserEnabled'    => true,
+                'isRemoteEnabled'         => false,
+                'dpi'                     => 150,
+            ])
+            ->setPaper('A4', 'portrait');
 
         return $pdf->download("Teklif_{$offerModel->offer_no}.pdf");
     }
