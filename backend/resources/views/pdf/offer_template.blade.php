@@ -258,41 +258,122 @@ html, body {
     &nbsp;&middot;&nbsp; Aylik enflasyon: <strong>%{{ $planData['monthly_inflation_rate'] }}</strong> (~Yillik %{{ $annRate }})
     &nbsp;&middot;&nbsp; Baz: {{ \Carbon\Carbon::parse($planData['offer_date'])->format('d.m.Y') }}
   </div>
-  <table class="ot">
-    <thead>
-      <tr>
+  @php
+    $allItems  = array_values($planData['items']);
+    $itemCount = count($allItems);
+    $splitMode = $itemCount > 12;
+    $col1      = $splitMode ? array_slice($allItems, 0, 12) : $allItems;
+    $col2      = $splitMode ? array_slice($allItems, 12)    : [];
+  @endphp
+
+  @if(!$splitMode)
+    {{-- TEK TABLO: 12 veya daha az kalem --}}
+    <table class="ot">
+      <thead><tr>
         <th style="width:6%">#</th>
         <th style="width:28%">Aciklama</th>
         <th style="width:20%">Odeme Tarihi</th>
         <th class="r" style="width:22%">Bugunun Degeri</th>
         <th class="r" style="width:24%">Odenecek Tutar</th>
-      </tr>
-    </thead>
-    <tbody>
-      @foreach($planData['items'] as $i => $item)
-      <tr class="{{ $i%2===1?'alt':'' }}">
-        <td style="color:#bbb">{{ $item['no'] }}</td>
-        <td><strong>{{ $item['description'] }}</strong></td>
-        <td>{{ $item['date'] }}</td>
-        <td class="r" style="color:#aaa">{{ number_format($item['real_amount'],0,',','.') }} TL</td>
-        <td class="r">
-          <strong>{{ number_format($item['nominal_amount'],0,',','.') }} TL</strong>
-          @if($item['month_offset']>0)
-            @php $pct=round(($item['nominal_amount']/max($item['real_amount'],1)-1)*100,1); @endphp
-            <span class="inf"> +%{{ $pct }}</span>
-          @endif
-        </td>
-      </tr>
-      @endforeach
-    </tbody>
-    <tfoot>
-      <tr>
+      </tr></thead>
+      <tbody>
+        @foreach($col1 as $i => $item)
+        <tr class="{{ $i%2===1?'alt':'' }}">
+          <td style="color:#bbb">{{ $item['no'] }}</td>
+          <td><strong>{{ $item['description'] }}</strong></td>
+          <td>{{ $item['date'] }}</td>
+          <td class="r" style="color:#aaa">{{ number_format($item['real_amount'],0,',','.') }} TL</td>
+          <td class="r">
+            <strong>{{ number_format($item['nominal_amount'],0,',','.') }} TL</strong>
+            @if($item['month_offset']>0)
+              @php $pct=round(($item['nominal_amount']/max($item['real_amount'],1)-1)*100,1); @endphp
+              <span class="inf"> +%{{ $pct }}</span>
+            @endif
+          </td>
+        </tr>
+        @endforeach
+      </tbody>
+      <tfoot><tr>
         <td colspan="3">Toplam</td>
         <td class="r" style="color:#888">{{ number_format($planData['total_real'],0,',','.') }} TL</td>
         <td class="r">{{ number_format($planData['total_nominal'],0,',','.') }} TL</td>
+      </tr></tfoot>
+    </table>
+  @else
+    {{-- YANYANA 2 TABLO: 12+ kalem --}}
+    <table style="width:100%; border-collapse:collapse;">
+      <tr>
+        {{-- Sol tablo: 1-12 --}}
+        <td style="width:49%; vertical-align:top; padding-right:2mm;">
+          <table class="ot" style="width:100%">
+            <thead><tr>
+              <th style="width:7%">#</th>
+              <th style="width:33%">Aciklama</th>
+              <th style="width:24%">Tarih</th>
+              <th class="r" style="width:36%">Tutar</th>
+            </tr></thead>
+            <tbody>
+              @foreach($col1 as $i => $item)
+              <tr class="{{ $i%2===1?'alt':'' }}">
+                <td style="color:#bbb">{{ $item['no'] }}</td>
+                <td><strong>{{ $item['description'] }}</strong></td>
+                <td>{{ $item['date'] }}</td>
+                <td class="r">
+                  <strong>{{ number_format($item['nominal_amount'],0,',','.') }} TL</strong>
+                  @if($item['month_offset']>0)
+                    @php $pct=round(($item['nominal_amount']/max($item['real_amount'],1)-1)*100,1); @endphp
+                    <span class="inf"> +%{{ $pct }}</span>
+                  @endif
+                </td>
+              </tr>
+              @endforeach
+            </tbody>
+          </table>
+        </td>
+        {{-- Orta ince ayraç --}}
+        <td style="width:2%; vertical-align:top; border-left:1px solid #e4e4e4;"></td>
+        {{-- Sağ tablo: 13+ --}}
+        <td style="width:49%; vertical-align:top; padding-left:2mm;">
+          <table class="ot" style="width:100%">
+            <thead><tr>
+              <th style="width:7%">#</th>
+              <th style="width:33%">Aciklama</th>
+              <th style="width:24%">Tarih</th>
+              <th class="r" style="width:36%">Tutar</th>
+            </tr></thead>
+            <tbody>
+              @foreach($col2 as $i => $item)
+              <tr class="{{ $i%2===1?'alt':'' }}">
+                <td style="color:#bbb">{{ $item['no'] }}</td>
+                <td><strong>{{ $item['description'] }}</strong></td>
+                <td>{{ $item['date'] }}</td>
+                <td class="r">
+                  <strong>{{ number_format($item['nominal_amount'],0,',','.') }} TL</strong>
+                  @if($item['month_offset']>0)
+                    @php $pct=round(($item['nominal_amount']/max($item['real_amount'],1)-1)*100,1); @endphp
+                    <span class="inf"> +%{{ $pct }}</span>
+                  @endif
+                </td>
+              </tr>
+              @endforeach
+            </tbody>
+          </table>
+        </td>
       </tr>
-    </tfoot>
-  </table>
+      {{-- Toplam satırı - tam genişlik --}}
+      <tr>
+        <td colspan="3" style="padding-top:2mm; border-top:1.5px solid #ddd;">
+          <table style="width:100%; border-collapse:collapse;">
+            <tr>
+              <td style="font-size:7pt; font-weight:700; color:#111; padding:3pt 6pt; background:#f5f5f5;">Toplam ({{ $itemCount }} kalem)</td>
+              <td style="font-size:7pt; color:#888; text-align:right; padding:3pt 6pt; background:#f5f5f5;">{{ number_format($planData['total_real'],0,',','.') }} TL bugunku deger</td>
+              <td style="font-size:7pt; font-weight:700; color:#111; text-align:right; padding:3pt 6pt; background:#f5f5f5; width:28%;">{{ number_format($planData['total_nominal'],0,',','.') }} TL</td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  @endif
 @else
   <div class="txt">{{ $offer->payment_plan }}</div>
 @endif
