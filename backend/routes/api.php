@@ -86,6 +86,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
         // Çek & Senet Yönetimi
         Route::get('checks/summary',  [CheckController::class, 'summary']);
+        Route::post('checks/{id}/copy', [CheckController::class, 'copy']);
         Route::apiResource('checks', CheckController::class);
 
         // Stok & Depo Yönetimi

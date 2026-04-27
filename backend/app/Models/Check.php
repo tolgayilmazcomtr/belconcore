@@ -9,8 +9,8 @@ class Check extends Model
     protected $table = 'checks';
 
     protected $fillable = [
-        'project_id', 'type', 'check_no', 'amount', 'issue_date', 'due_date',
-        'bank_name', 'branch', 'counterparty', 'description', 'status',
+        'project_id', 'type', 'document_type', 'check_no', 'amount', 'issue_date', 'due_date',
+        'bank_name', 'branch', 'counterparty', 'description', 'attachment_path', 'status',
         'accounting_account_id', 'invoice_id', 'created_by',
     ];
 

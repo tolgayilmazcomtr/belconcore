@@ -44,6 +44,11 @@ class Offer extends Model
         return $this->belongsTo(Unit::class);
     }
 
+    public function items()
+    {
+        return $this->hasMany(OfferItem::class)->orderBy('sort_order');
+    }
+
     public function creator()
     {
         return $this->belongsTo(User::class, 'created_by');

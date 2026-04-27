@@ -29,6 +29,16 @@ class OfferResource extends JsonResource
             'lead' => new LeadResource($this->whenLoaded('lead')),
             'unit' => new UnitResource($this->whenLoaded('unit')),
             'creator' => new UserResource($this->whenLoaded('creator')),
+            'items' => $this->whenLoaded('items', fn() => $this->items->map(fn($item) => [
+                'id'              => $item->id,
+                'unit_id'         => $item->unit_id,
+                'unit_label'      => $item->unit_label,
+                'list_price'      => $item->list_price,
+                'discount_amount' => $item->discount_amount,
+                'final_price'     => $item->final_price,
+                'sort_order'      => $item->sort_order,
+                'unit'            => $item->relationLoaded('unit') ? new UnitResource($item->unit) : null,
+            ])),
             
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,

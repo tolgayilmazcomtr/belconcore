@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState, useMemo, useCallback } from 'react';
+import React, { useEffect, useState, useMemo, useCallback, useRef } from 'react';
 import ReactDOM from 'react-dom';
 import { useProjectStore } from '@/store/useProjectStore';
 import api from '@/lib/api';
@@ -8,7 +8,7 @@ import { toast } from 'sonner';
 import {
     FileText, Plus, Calendar, List, ChevronLeft, ChevronRight,
     ArrowDownLeft, ArrowUpRight, Clock, CheckCircle2, XCircle, AlertTriangle,
-    Trash2, Edit2, MoreVertical, X, TrendingUp, AlertCircle,
+    Trash2, Edit2, MoreVertical, X, TrendingUp, AlertCircle, Copy, Paperclip,
 } from 'lucide-react';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -17,6 +17,7 @@ interface Check {
     id: number;
     project_id: number;
     type: 'received' | 'given';
+    document_type: 'check' | 'note';
     check_no?: string;
     amount: number;
     issue_date: string;
@@ -25,6 +26,8 @@ interface Check {
     branch?: string;
     counterparty?: string;
     description?: string;
+    attachment_path?: string;
+    attachment_url?: string;
     status: 'pending' | 'cleared' | 'returned' | 'bounced';
     accounting_account_id?: number;
     invoice_id?: number;
@@ -81,43 +84,76 @@ function daysLabel(days: number | undefined, status: string) {
 
 const EMPTY_FORM = {
     type: 'received' as 'received' | 'given',
+    document_type: 'check' as 'check' | 'note',
     check_no: '', amount: '', issue_date: new Date().toISOString().slice(0, 10),
     due_date: '', bank_name: '', branch: '', counterparty: '',
     description: '', status: 'pending' as Check['status'],
 };
 
-function CheckFormModal({ check, onClose, onSaved, projectId }: {
-    check?: Check; onClose: () => void; onSaved: (c: Check) => void; projectId: number;
+function CheckFormModal({ check, initialDocumentType, onClose, onSaved, projectId }: {
+    check?: Check;
+    initialDocumentType?: 'check' | 'note';
+    onClose: () => void;
+    onSaved: (c: Check) => void;
+    projectId: number;
 }) {
     const [form, setForm] = useState(check ? {
-        type: check.type, check_no: check.check_no || '', amount: String(check.amount),
-        issue_date: check.issue_date, due_date: check.due_date,
-        bank_name: check.bank_name || '', branch: check.branch || '',
-        counterparty: check.counterparty || '', description: check.description || '',
+        type: check.type,
+        document_type: check.document_type ?? 'check',
+        check_no: check.check_no || '',
+        amount: String(check.amount),
+        issue_date: check.issue_date ? String(check.issue_date).slice(0, 10) : '',
+        due_date: check.due_date ? String(check.due_date).slice(0, 10) : '',
+        bank_name: check.bank_name || '',
+        branch: check.branch || '',
+        counterparty: check.counterparty || '',
+        description: check.description || '',
         status: check.status,
-    } : EMPTY_FORM);
+    } : { ...EMPTY_FORM, document_type: initialDocumentType ?? 'check' });
+
     const [saving, setSaving] = useState(false);
+    const [attachmentFile, setAttachmentFile] = useState<File | null>(null);
+    const fileRef = useRef<HTMLInputElement>(null);
 
     const set = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }));
+
+    const isNote = form.document_type === 'note';
+    const docLabel = isNote ? 'Senet' : 'Çek';
 
     const handleSubmit = async (e: React.SyntheticEvent) => {
         e.preventDefault();
         if (!form.due_date) { toast.error('Vade tarihi zorunlu'); return; }
         setSaving(true);
         try {
-            const payload = {
-                ...form, amount: parseFloat(form.amount),
-                active_project_id: projectId,
-            };
+            const payload = new FormData();
+            payload.append('type', form.type);
+            payload.append('document_type', form.document_type);
+            payload.append('check_no', form.check_no);
+            payload.append('amount', String(parseFloat(form.amount)));
+            payload.append('issue_date', form.issue_date);
+            payload.append('due_date', form.due_date);
+            payload.append('bank_name', form.bank_name);
+            payload.append('branch', form.branch);
+            payload.append('counterparty', form.counterparty);
+            payload.append('description', form.description);
+            payload.append('status', form.status);
+            payload.append('active_project_id', String(projectId));
+            if (attachmentFile) payload.append('attachment', attachmentFile);
+
             let saved: Check;
             if (check) {
-                const res = await api.put(`/checks/${check.id}`, payload);
+                payload.append('_method', 'PUT');
+                const res = await api.post(`/checks/${check.id}`, payload, {
+                    headers: { 'Content-Type': 'multipart/form-data' },
+                });
                 saved = res.data.data;
             } else {
-                const res = await api.post('/checks', payload);
+                const res = await api.post('/checks', payload, {
+                    headers: { 'Content-Type': 'multipart/form-data' },
+                });
                 saved = res.data.data;
             }
-            toast.success(check ? 'Çek güncellendi' : 'Çek kaydedildi');
+            toast.success(check ? `${docLabel} güncellendi` : `${docLabel} kaydedildi`);
             onSaved(saved);
         } catch (err: any) {
             toast.error(err?.response?.data?.message || 'Bir hata oluştu');
@@ -134,8 +170,23 @@ function CheckFormModal({ check, onClose, onSaved, projectId }: {
                 onSubmit={handleSubmit}
             >
                 <div className="flex items-center justify-between">
-                    <h2 className="text-sm font-semibold text-slate-800">{check ? 'Çeki Düzenle' : 'Yeni Çek Ekle'}</h2>
+                    <h2 className="text-sm font-semibold text-slate-800">
+                        {check ? `${docLabel} Düzenle` : `Yeni ${docLabel} Ekle`}
+                    </h2>
                     <button type="button" onClick={onClose}><X className="w-4 h-4 text-slate-400" /></button>
+                </div>
+
+                {/* Document type tabs */}
+                <div className="flex rounded-lg border border-slate-200 overflow-hidden">
+                    {(['check', 'note'] as const).map(dt => (
+                        <button
+                            key={dt} type="button"
+                            className={`flex-1 py-2 text-xs font-medium transition-colors ${form.document_type === dt ? 'bg-slate-800 text-white' : 'text-slate-500 hover:bg-slate-50'}`}
+                            onClick={() => set('document_type', dt)}
+                        >
+                            {dt === 'check' ? '📄 Çek' : '📝 Senet'}
+                        </button>
+                    ))}
                 </div>
 
                 {/* Type tabs */}
@@ -146,7 +197,7 @@ function CheckFormModal({ check, onClose, onSaved, projectId }: {
                             className={`flex-1 py-2 text-xs font-medium transition-colors ${form.type === t ? (t === 'received' ? 'bg-blue-600 text-white' : 'bg-purple-600 text-white') : 'text-slate-500 hover:bg-slate-50'}`}
                             onClick={() => set('type', t)}
                         >
-                            {t === 'received' ? '↙ Alınan Çek' : '↗ Verilen Çek'}
+                            {t === 'received' ? '↙ Alınan' : '↗ Verilen'}
                         </button>
                     ))}
                 </div>
@@ -161,8 +212,8 @@ function CheckFormModal({ check, onClose, onSaved, projectId }: {
                         <input required type="number" step="0.01" min="0" className="input-field" placeholder="0.00" value={form.amount} onChange={e => set('amount', e.target.value)} />
                     </label>
                     <label className="flex flex-col gap-1">
-                        <span className="text-[10px] text-slate-400 uppercase font-semibold">Çek No</span>
-                        <input className="input-field" placeholder="Çek numarası" value={form.check_no} onChange={e => set('check_no', e.target.value)} />
+                        <span className="text-[10px] text-slate-400 uppercase font-semibold">{docLabel} No</span>
+                        <input className="input-field" placeholder={`${docLabel} numarası`} value={form.check_no} onChange={e => set('check_no', e.target.value)} />
                     </label>
                     <label className="flex flex-col gap-1">
                         <span className="text-[10px] text-slate-400 uppercase font-semibold">Düzenleme Tarihi</span>
@@ -190,6 +241,30 @@ function CheckFormModal({ check, onClose, onSaved, projectId }: {
                         <span className="text-[10px] text-slate-400 uppercase font-semibold">Açıklama</span>
                         <textarea rows={2} className="input-field resize-none" placeholder="Notlar..." value={form.description} onChange={e => set('description', e.target.value)} />
                     </label>
+
+                    {/* File upload */}
+                    <label className="col-span-2 flex flex-col gap-1">
+                        <span className="text-[10px] text-slate-400 uppercase font-semibold">Belge / Görsel</span>
+                        <div
+                            className="flex items-center gap-2 border border-dashed border-slate-200 rounded-lg px-3 py-2.5 cursor-pointer hover:bg-slate-50"
+                            onClick={() => fileRef.current?.click()}
+                        >
+                            <Paperclip className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                            <span className="text-xs text-slate-500 truncate">
+                                {attachmentFile ? attachmentFile.name : check?.attachment_path ? 'Mevcut dosya var — yeni seçin' : 'JPG, PNG veya PDF (maks 10 MB)'}
+                            </span>
+                        </div>
+                        <input
+                            ref={fileRef}
+                            type="file"
+                            accept="image/jpeg,image/png,application/pdf"
+                            className="hidden"
+                            onChange={e => setAttachmentFile(e.target.files?.[0] ?? null)}
+                        />
+                        {check?.attachment_url && !attachmentFile && (
+                            <a href={check.attachment_url} target="_blank" rel="noreferrer" className="text-[10px] text-blue-600 underline mt-0.5">Mevcut dosyayı görüntüle</a>
+                        )}
+                    </label>
                 </div>
 
                 <div className="flex gap-2 pt-1">
@@ -206,10 +281,10 @@ function CheckFormModal({ check, onClose, onSaved, projectId }: {
 
 // ─── Context Menu ─────────────────────────────────────────────────────────────
 
-function CtxMenuPortal({ x, y, check, onEdit, onStatus, onDelete, onClose }: {
+function CtxMenuPortal({ x, y, check, onEdit, onStatus, onDelete, onCopy, onClose }: {
     x: number; y: number; check: Check;
     onEdit: () => void; onStatus: (s: Check['status']) => void;
-    onDelete: () => void; onClose: () => void;
+    onDelete: () => void; onCopy: () => void; onClose: () => void;
 }) {
     const menuW = 180;
     const left = x + menuW > window.innerWidth ? x - menuW : x;
@@ -219,6 +294,9 @@ function CtxMenuPortal({ x, y, check, onEdit, onStatus, onDelete, onClose }: {
             <div className="fixed z-50 bg-white border border-slate-200 rounded-xl shadow-xl py-1 w-44" style={{ top: y, left }}>
                 <button onClick={onEdit} className="w-full px-4 py-2 text-xs text-left text-slate-700 hover:bg-slate-50 flex items-center gap-2">
                     <Edit2 className="w-3.5 h-3.5" /> Düzenle
+                </button>
+                <button onClick={onCopy} className="w-full px-4 py-2 text-xs text-left text-slate-700 hover:bg-slate-50 flex items-center gap-2">
+                    <Copy className="w-3.5 h-3.5" /> Kopyala
                 </button>
                 <div className="border-t border-slate-100 my-1" />
                 {check.status !== 'cleared' && (
@@ -258,11 +336,10 @@ function CalendarView({ checks }: { checks: Check[] }) {
     const year = viewDate.getFullYear();
     const month = viewDate.getMonth();
 
-    const firstDay = new Date(year, month, 1).getDay(); // 0=Sun
+    const firstDay = new Date(year, month, 1).getDay();
     const daysInMonth = new Date(year, month + 1, 0).getDate();
     const today = new Date();
 
-    // Group checks by due_date
     const byDay = useMemo(() => {
         const map: Record<number, Check[]> = {};
         checks.forEach(c => {
@@ -278,8 +355,6 @@ function CalendarView({ checks }: { checks: Check[] }) {
 
     const monthNames = ['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran','Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık'];
     const dayNames = ['Paz','Pzt','Sal','Çar','Per','Cum','Cmt'];
-
-    // Start from Monday: shift so Mon=0
     const startOffset = (firstDay + 6) % 7;
 
     return (
@@ -312,7 +387,7 @@ function CalendarView({ checks }: { checks: Check[] }) {
                             <div className="space-y-0.5">
                                 {dayChecks.slice(0, 3).map(c => (
                                     <div key={c.id} className={`text-[9px] px-1 py-0.5 rounded truncate leading-tight ${c.type === 'received' ? 'bg-blue-50 text-blue-700' : 'bg-purple-50 text-purple-700'} ${c.status === 'cleared' ? 'opacity-40 line-through' : ''} ${c.status === 'bounced' ? 'bg-red-50 text-red-700' : ''}`}>
-                                        {c.counterparty || `Çek #${c.id}`} · {fmtK(c.amount)}
+                                        {c.counterparty || `#${c.id}`} · {fmtK(c.amount)}
                                     </div>
                                 ))}
                                 {dayChecks.length > 3 && <div className="text-[9px] text-slate-400 pl-1">+{dayChecks.length - 3} daha</div>}
@@ -340,8 +415,9 @@ export default function ChecksPage() {
     const [loading, setLoading] = useState(true);
     const [view, setView] = useState<'list' | 'calendar'>('list');
     const [tab, setTab] = useState<'all' | 'received' | 'given'>('all');
+    const [docFilter, setDocFilter] = useState<'all' | 'check' | 'note'>('all');
     const [statusFilter, setStatusFilter] = useState('');
-    const [formOpen, setFormOpen] = useState(false);
+    const [formOpen, setFormOpen] = useState<false | 'check' | 'note'>(false);
     const [editCheck, setEditCheck] = useState<Check | undefined>();
     const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; check: Check } | null>(null);
 
@@ -368,12 +444,17 @@ export default function ChecksPage() {
         });
         setFormOpen(false);
         setEditCheck(undefined);
-        load(); // reload summary
+        load();
     };
 
     const handleStatus = async (check: Check, status: Check['status']) => {
         try {
-            const res = await api.put(`/checks/${check.id}`, { status });
+            const payload = new FormData();
+            payload.append('_method', 'PUT');
+            payload.append('status', status);
+            const res = await api.post(`/checks/${check.id}`, payload, {
+                headers: { 'Content-Type': 'multipart/form-data' },
+            });
             setChecks(prev => prev.map(c => c.id === check.id ? { ...c, ...res.data.data } : c));
             toast.success('Durum güncellendi');
         } catch { toast.error('Hata'); }
@@ -381,22 +462,35 @@ export default function ChecksPage() {
     };
 
     const handleDelete = async (check: Check) => {
-        if (!confirm(`"${check.counterparty || 'Çek #' + check.id}" silinecek. Emin misiniz?`)) return;
+        const label = check.document_type === 'note' ? 'Senet' : 'Çek';
+        if (!confirm(`"${check.counterparty || label + ' #' + check.id}" silinecek. Emin misiniz?`)) return;
         try {
             await api.delete(`/checks/${check.id}`);
             setChecks(prev => prev.filter(c => c.id !== check.id));
-            toast.success('Çek silindi');
+            toast.success(`${label} silindi`);
         } catch { toast.error('Silinemedi'); }
         setCtxMenu(null);
+    };
+
+    const handleCopy = async (check: Check) => {
+        setCtxMenu(null);
+        try {
+            const res = await api.post(`/checks/${check.id}/copy`);
+            const copied: Check = res.data.data;
+            setChecks(prev => [copied, ...prev]);
+            toast.success('Kopya oluşturuldu');
+            load();
+        } catch { toast.error('Kopyalanamadı'); }
     };
 
     const filtered = useMemo(() => {
         return checks.filter(c => {
             if (tab !== 'all' && c.type !== tab) return false;
+            if (docFilter !== 'all' && c.document_type !== docFilter) return false;
             if (statusFilter && c.status !== statusFilter) return false;
             return true;
         });
-    }, [checks, tab, statusFilter]);
+    }, [checks, tab, docFilter, statusFilter]);
 
     if (!activeProject) {
         return (
@@ -415,7 +509,7 @@ export default function ChecksPage() {
                     <h1 className="text-base font-semibold text-slate-800 flex items-center gap-2">
                         <FileText className="w-4 h-4 text-primary" /> Çek & Senet Yönetimi
                     </h1>
-                    <p className="text-xs text-slate-400 mt-0.5">{activeProject.name} · Çek takibi ve vade takvimi</p>
+                    <p className="text-xs text-slate-400 mt-0.5">{activeProject.name} · Çek ve senet takibi</p>
                 </div>
                 <div className="flex items-center gap-2">
                     <div className="flex rounded-lg border border-slate-200 overflow-hidden">
@@ -427,10 +521,16 @@ export default function ChecksPage() {
                         </button>
                     </div>
                     <button
-                        onClick={() => { setEditCheck(undefined); setFormOpen(true); }}
+                        onClick={() => { setEditCheck(undefined); setFormOpen('check'); }}
                         className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white text-xs font-semibold rounded-lg hover:bg-blue-700"
                     >
                         <Plus className="w-3.5 h-3.5" /> Yeni Çek
+                    </button>
+                    <button
+                        onClick={() => { setEditCheck(undefined); setFormOpen('note'); }}
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-700 text-white text-xs font-semibold rounded-lg hover:bg-slate-800"
+                    >
+                        <Plus className="w-3.5 h-3.5" /> Senet Ekle
                     </button>
                 </div>
             </div>
@@ -439,12 +539,12 @@ export default function ChecksPage() {
             {summary && (
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
                     {[
-                        { label: 'Alınan Bekleyen', value: fmtK(summary.received_pending_amount), sub: `${summary.received_pending_count} çek`, color: 'text-blue-700', bg: 'bg-blue-50', icon: <ArrowDownLeft className="w-3.5 h-3.5 text-blue-600" /> },
-                        { label: 'Verilen Bekleyen', value: fmtK(summary.given_pending_amount), sub: `${summary.given_pending_count} çek`, color: 'text-purple-700', bg: 'bg-purple-50', icon: <ArrowUpRight className="w-3.5 h-3.5 text-purple-600" /> },
+                        { label: 'Alınan Bekleyen', value: fmtK(summary.received_pending_amount), sub: `${summary.received_pending_count} kayıt`, color: 'text-blue-700', bg: 'bg-blue-50', icon: <ArrowDownLeft className="w-3.5 h-3.5 text-blue-600" /> },
+                        { label: 'Verilen Bekleyen', value: fmtK(summary.given_pending_amount), sub: `${summary.given_pending_count} kayıt`, color: 'text-purple-700', bg: 'bg-purple-50', icon: <ArrowUpRight className="w-3.5 h-3.5 text-purple-600" /> },
                         { label: 'Vadesi Yakın', value: String(summary.due_soon_count), sub: '30 gün içinde', color: 'text-amber-700', bg: 'bg-amber-50', icon: <Clock className="w-3.5 h-3.5 text-amber-600" /> },
-                        { label: 'Vadesi Geçmiş', value: String(summary.overdue_count), sub: 'beklemede çek', color: 'text-red-700', bg: 'bg-red-50', icon: <AlertCircle className="w-3.5 h-3.5 text-red-600" /> },
-                        { label: 'Net Alacak Çek', value: fmtK(summary.received_pending_amount - summary.given_pending_amount), sub: 'alınan - verilen', color: (summary.received_pending_amount >= summary.given_pending_amount) ? 'text-green-700' : 'text-red-700', bg: (summary.received_pending_amount >= summary.given_pending_amount) ? 'bg-green-50' : 'bg-red-50', icon: <TrendingUp className="w-3.5 h-3.5 text-green-600" /> },
-                        { label: 'Toplam Çek', value: String(checks.length), sub: 'tüm kayıtlar', color: 'text-slate-700', bg: 'bg-slate-50', icon: <FileText className="w-3.5 h-3.5 text-slate-500" /> },
+                        { label: 'Vadesi Geçmiş', value: String(summary.overdue_count), sub: 'bekleyen kayıt', color: 'text-red-700', bg: 'bg-red-50', icon: <AlertCircle className="w-3.5 h-3.5 text-red-600" /> },
+                        { label: 'Net Alacak', value: fmtK(summary.received_pending_amount - summary.given_pending_amount), sub: 'alınan - verilen', color: (summary.received_pending_amount >= summary.given_pending_amount) ? 'text-green-700' : 'text-red-700', bg: (summary.received_pending_amount >= summary.given_pending_amount) ? 'bg-green-50' : 'bg-red-50', icon: <TrendingUp className="w-3.5 h-3.5 text-green-600" /> },
+                        { label: 'Toplam Kayıt', value: String(checks.length), sub: 'çek + senet', color: 'text-slate-700', bg: 'bg-slate-50', icon: <FileText className="w-3.5 h-3.5 text-slate-500" /> },
                     ].map(s => (
                         <div key={s.label} className={`${s.bg} rounded-xl p-3 border border-slate-100`}>
                             <div className="flex items-center justify-between mb-1">{s.icon}<span className="text-[9px] font-semibold text-slate-400 uppercase tracking-wide text-right leading-tight">{s.label}</span></div>
@@ -461,12 +561,18 @@ export default function ChecksPage() {
             {/* List View */}
             {view === 'list' && (
                 <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-                    {/* Tabs + filters */}
                     <div className="flex flex-col sm:flex-row sm:items-center gap-2 px-4 pt-3 pb-2 border-b border-slate-100">
                         <div className="flex rounded-lg overflow-hidden border border-slate-200 text-xs font-medium">
                             {(['all', 'received', 'given'] as const).map(t => (
                                 <button key={t} onClick={() => setTab(t)} className={`px-3 py-1.5 ${tab === t ? 'bg-slate-800 text-white' : 'text-slate-500 hover:bg-slate-50'}`}>
                                     {t === 'all' ? 'Tümü' : t === 'received' ? '↙ Alınan' : '↗ Verilen'}
+                                </button>
+                            ))}
+                        </div>
+                        <div className="flex rounded-lg overflow-hidden border border-slate-200 text-xs font-medium">
+                            {(['all', 'check', 'note'] as const).map(dt => (
+                                <button key={dt} onClick={() => setDocFilter(dt)} className={`px-3 py-1.5 ${docFilter === dt ? 'bg-slate-600 text-white' : 'text-slate-500 hover:bg-slate-50'}`}>
+                                    {dt === 'all' ? 'Çek+Senet' : dt === 'check' ? 'Çek' : 'Senet'}
                                 </button>
                             ))}
                         </div>
@@ -491,7 +597,7 @@ export default function ChecksPage() {
                                     <tr className="text-[10px] text-slate-400 uppercase tracking-wide border-b border-slate-100">
                                         <th className="px-4 py-2 text-left font-semibold">Tür</th>
                                         <th className="px-4 py-2 text-left font-semibold">Kimden / Kime</th>
-                                        <th className="px-4 py-2 text-left font-semibold">Çek No</th>
+                                        <th className="px-4 py-2 text-left font-semibold">No</th>
                                         <th className="px-4 py-2 text-left font-semibold">Banka</th>
                                         <th className="px-4 py-2 text-right font-semibold">Tutar</th>
                                         <th className="px-4 py-2 text-center font-semibold">Vade Tarihi</th>
@@ -508,13 +614,21 @@ export default function ChecksPage() {
                                             onContextMenu={e => { e.preventDefault(); setCtxMenu({ x: e.clientX, y: e.clientY, check: c }); }}
                                         >
                                             <td className="px-4 py-2.5">
-                                                {c.type === 'received' ? (
-                                                    <span className="inline-flex items-center gap-1 text-blue-600 font-semibold"><ArrowDownLeft className="w-3 h-3" />Alınan</span>
-                                                ) : (
-                                                    <span className="inline-flex items-center gap-1 text-purple-600 font-semibold"><ArrowUpRight className="w-3 h-3" />Verilen</span>
-                                                )}
+                                                <div className="flex flex-col gap-0.5">
+                                                    {c.type === 'received' ? (
+                                                        <span className="inline-flex items-center gap-1 text-blue-600 font-semibold"><ArrowDownLeft className="w-3 h-3" />Alınan</span>
+                                                    ) : (
+                                                        <span className="inline-flex items-center gap-1 text-purple-600 font-semibold"><ArrowUpRight className="w-3 h-3" />Verilen</span>
+                                                    )}
+                                                    <span className="text-[9px] text-slate-400">{c.document_type === 'note' ? 'Senet' : 'Çek'}</span>
+                                                </div>
                                             </td>
-                                            <td className="px-4 py-2.5 font-medium text-slate-800 max-w-[140px] truncate">{c.counterparty || '—'}</td>
+                                            <td className="px-4 py-2.5 font-medium text-slate-800 max-w-[140px] truncate">
+                                                <div className="flex items-center gap-1">
+                                                    {c.counterparty || '—'}
+                                                    {c.attachment_path && <Paperclip className="w-3 h-3 text-slate-300 shrink-0" />}
+                                                </div>
+                                            </td>
                                             <td className="px-4 py-2.5 font-mono text-slate-500">{c.check_no || '—'}</td>
                                             <td className="px-4 py-2.5 text-slate-500 max-w-[120px] truncate">{c.bank_name ? `${c.bank_name}${c.branch ? ' / ' + c.branch : ''}` : '—'}</td>
                                             <td className="px-4 py-2.5 text-right font-mono font-semibold text-slate-800">{fmt(c.amount)}</td>
@@ -562,8 +676,8 @@ export default function ChecksPage() {
                                         ? <ArrowDownLeft className="w-3.5 h-3.5 text-blue-500 shrink-0" />
                                         : <ArrowUpRight className="w-3.5 h-3.5 text-purple-500 shrink-0" />}
                                     <div className="flex-1 min-w-0">
-                                        <p className="font-medium text-slate-800 truncate">{c.counterparty || `Çek #${c.id}`}</p>
-                                        <p className="text-[10px] text-slate-400">{c.bank_name || ''}{c.check_no ? ` · #${c.check_no}` : ''}</p>
+                                        <p className="font-medium text-slate-800 truncate">{c.counterparty || `#${c.id}`}</p>
+                                        <p className="text-[10px] text-slate-400">{c.document_type === 'note' ? 'Senet' : 'Çek'}{c.bank_name ? ` · ${c.bank_name}` : ''}{c.check_no ? ` · #${c.check_no}` : ''}</p>
                                     </div>
                                     <div className="text-right shrink-0">
                                         <p className="font-mono font-semibold text-slate-800">{fmt(c.amount)}</p>
@@ -579,6 +693,7 @@ export default function ChecksPage() {
             {(formOpen || editCheck) && (
                 <CheckFormModal
                     check={editCheck}
+                    initialDocumentType={formOpen !== false ? formOpen : undefined}
                     projectId={activeProject.id}
                     onClose={() => { setFormOpen(false); setEditCheck(undefined); }}
                     onSaved={handleSaved}
@@ -592,6 +707,7 @@ export default function ChecksPage() {
                     onEdit={() => { setEditCheck(ctxMenu.check); setCtxMenu(null); }}
                     onStatus={s => handleStatus(ctxMenu.check, s)}
                     onDelete={() => handleDelete(ctxMenu.check)}
+                    onCopy={() => handleCopy(ctxMenu.check)}
                     onClose={() => setCtxMenu(null)}
                 />
             )}
