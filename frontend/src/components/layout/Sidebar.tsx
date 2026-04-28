@@ -20,6 +20,7 @@ interface NavChild {
   href: string;
   icon?: React.ReactNode;
   exact?: boolean;
+  module?: string;
 }
 interface NavSection {
   kind: "section";
@@ -48,7 +49,7 @@ const NAV: NavEntry[] = [
       { label: "Tüm Projeler", href: "/projects", icon: <Building2 size={13} /> },
       { label: "Bloklar / Binalar", href: "/blocks", icon: <Building size={13} /> },
       { label: "Üniteler / Daireler", href: "/units", icon: <Home size={13} /> },
-      { label: "3D Satış Ekranı", href: "/3d-sale", icon: <Box size={13} /> },
+      { label: "3D Satış Ekranı", href: "/3d-sale", icon: <Box size={13} />, module: "module.projects" },
     ],
   },
   {
@@ -319,12 +320,20 @@ export function Sidebar() {
 
   const isAdmin = user?.roles?.some(r => r.name === 'Admin') ?? false;
   const modulesLoaded = Array.isArray(user?.modules);
-  const visibleNav = NAV.filter(entry => {
-    if (!entry.module) return true;
+  const canModule = (mod?: string) => {
+    if (!mod) return true;
     if (isAdmin) return true;
-    if (!modulesLoaded) return true; // modules not yet fetched — show all to avoid blank sidebar
-    return user!.modules!.includes(entry.module);
-  });
+    if (!modulesLoaded) return true;
+    return user!.modules!.includes(mod);
+  };
+  const visibleNav = NAV.filter(entry => canModule(entry.module)).map(entry => ({
+    ...entry,
+    children: entry.children?.filter(child =>
+      isNavSection(child)
+        ? true
+        : canModule((child as NavChild).module)
+    ),
+  }));
 
   useKeyboardShortcuts(() => setPaletteOpen(true));
 

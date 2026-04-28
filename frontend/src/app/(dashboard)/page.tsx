@@ -58,7 +58,8 @@ export default function DashboardPage() {
     const isAdmin = user?.roles?.some(r => r.name === 'Admin') ?? false;
     const modules = user?.modules ?? [];
 
-    const can = (mod: string) => isAdmin || !Array.isArray(user?.modules) || modules.includes(mod);
+    const modulesReady = isAdmin || Array.isArray(user?.modules);
+    const can = (mod: string) => isAdmin || (modulesReady && modules.includes(mod));
 
     const hasProjects    = can('module.projects');
     const hasCrm         = can('module.crm');
@@ -73,7 +74,7 @@ export default function DashboardPage() {
     const dateTo   = `${year}-${String(month).padStart(2, '0')}-31`;
 
     useEffect(() => {
-        if (!activeProject) { setLoading(false); return; }
+        if (!activeProject || !modulesReady) { setLoading(false); return; }
         setLoading(true);
         const pid = activeProject.id;
 

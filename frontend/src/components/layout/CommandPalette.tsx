@@ -3,48 +3,51 @@
 import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { Search } from 'lucide-react';
+import { useAuthStore } from '@/store/useAuthStore';
 
 // ─── All navigable pages with shortcuts ──────────────────────────────────────
 export interface CommandItem {
     label: string;
     href: string;
     section: string;
-    shortcut?: string[]; // e.g. ['G', 'C']
+    module?: string;
+    shortcut?: string[];
     keywords?: string;
 }
 
 export const COMMANDS: CommandItem[] = [
     // Dashboard
-    { label: 'Dashboard', href: '/', section: 'GENEL', shortcut: ['G', 'D'], keywords: 'ana sayfa' },
+    { label: 'Dashboard', href: '/', section: 'GENEL', module: 'module.dashboard', shortcut: ['G', 'D'], keywords: 'ana sayfa' },
 
     // Proje Yönetimi
-    { label: 'Tüm Projeler', href: '/projects', section: 'PROJE YÖNETİMİ', shortcut: ['G', 'P'], keywords: 'proje' },
-    { label: 'Bloklar / Binalar', href: '/blocks', section: 'PROJE YÖNETİMİ', shortcut: ['G', 'B'], keywords: 'blok bina' },
-    { label: 'Üniteler / Daireler', href: '/units', section: 'PROJE YÖNETİMİ', shortcut: ['G', 'U'], keywords: 'ünite daire' },
+    { label: 'Tüm Projeler', href: '/projects', section: 'PROJE YÖNETİMİ', module: 'module.projects', shortcut: ['G', 'P'], keywords: 'proje' },
+    { label: 'Bloklar / Binalar', href: '/blocks', section: 'PROJE YÖNETİMİ', module: 'module.projects', shortcut: ['G', 'B'], keywords: 'blok bina' },
+    { label: 'Üniteler / Daireler', href: '/units', section: 'PROJE YÖNETİMİ', module: 'module.projects', shortcut: ['G', 'U'], keywords: 'ünite daire' },
+    { label: '3D Satış Ekranı', href: '/3d-sale', section: 'PROJE YÖNETİMİ', module: 'module.projects', keywords: '3d satış' },
 
     // CRM
-    { label: 'Müşteriler', href: '/customers', section: 'CRM & SATIŞ', shortcut: ['G', 'M'], keywords: 'müşteri crm' },
-    { label: 'Fırsatlar', href: '/crm', section: 'CRM & SATIŞ', shortcut: ['G', 'F'], keywords: 'fırsat lead kanban' },
-    { label: 'Teklifler', href: '/offers', section: 'CRM & SATIŞ', shortcut: ['G', 'T'], keywords: 'teklif offer' },
+    { label: 'Müşteriler', href: '/customers', section: 'CRM & SATIŞ', module: 'module.crm', shortcut: ['G', 'M'], keywords: 'müşteri crm' },
+    { label: 'Fırsatlar', href: '/crm', section: 'CRM & SATIŞ', module: 'module.crm', shortcut: ['G', 'F'], keywords: 'fırsat lead kanban' },
+    { label: 'Teklifler', href: '/offers', section: 'CRM & SATIŞ', module: 'module.crm', shortcut: ['G', 'T'], keywords: 'teklif offer' },
 
     // Accounting
-    { label: 'Genel Bakış', href: '/accounting', section: 'ÖN MUHASEBE', shortcut: ['G', 'G'], keywords: 'muhasebe genel bakış' },
-    { label: 'Cariler', href: '/accounting/accounts', section: 'ÖN MUHASEBE', shortcut: ['G', 'C'], keywords: 'cari hesap müşteri tedarikçi' },
-    { label: 'Satışlar', href: '/accounting/sales', section: 'FATURALAR', shortcut: ['G', 'S'], keywords: 'satış fatura' },
-    { label: 'Alışlar', href: '/accounting/purchases', section: 'FATURALAR', shortcut: ['G', 'A'], keywords: 'alış fatura tedarikçi' },
-    { label: 'Kasa ve Bankalar', href: '/accounting/finance', section: 'FİNANS', shortcut: ['G', 'K'], keywords: 'kasa banka nakit' },
-    { label: 'Maliyet Takip', href: '/accounting/costs', section: 'FİNANS', shortcut: ['G', 'M'], keywords: 'maliyet imalat inşaat bütçe' },
-    { label: 'Gün Sonu Raporu', href: '/accounting/reports/daily', section: 'RAPORLAR', shortcut: ['G', 'R'], keywords: 'gün sonu rapor' },
-    { label: 'KDV Raporu', href: '/accounting/reports/vat', section: 'RAPORLAR', keywords: 'kdv vergi' },
-    { label: 'Alacak Raporu', href: '/accounting/reports/receivable', section: 'RAPORLAR', keywords: 'alacak' },
-    { label: 'Borç Raporu', href: '/accounting/reports/payable', section: 'RAPORLAR', keywords: 'borç' },
+    { label: 'Genel Bakış', href: '/accounting', section: 'ÖN MUHASEBE', module: 'module.accounting', shortcut: ['G', 'G'], keywords: 'muhasebe genel bakış' },
+    { label: 'Cariler', href: '/accounting/accounts', section: 'ÖN MUHASEBE', module: 'module.accounting', shortcut: ['G', 'C'], keywords: 'cari hesap müşteri tedarikçi' },
+    { label: 'Satışlar', href: '/accounting/sales', section: 'FATURALAR', module: 'module.accounting', shortcut: ['G', 'S'], keywords: 'satış fatura' },
+    { label: 'Alışlar', href: '/accounting/purchases', section: 'FATURALAR', module: 'module.accounting', shortcut: ['G', 'A'], keywords: 'alış fatura tedarikçi' },
+    { label: 'Kasa ve Bankalar', href: '/accounting/finance', section: 'FİNANS', module: 'module.accounting', shortcut: ['G', 'K'], keywords: 'kasa banka nakit' },
+    { label: 'Maliyet Takip', href: '/accounting/costs', section: 'FİNANS', module: 'module.stock', shortcut: ['G', 'M'], keywords: 'maliyet imalat inşaat bütçe' },
+    { label: 'Gün Sonu Raporu', href: '/accounting/reports/daily', section: 'RAPORLAR', module: 'module.reports', shortcut: ['G', 'R'], keywords: 'gün sonu rapor' },
+    { label: 'KDV Raporu', href: '/accounting/reports/vat', section: 'RAPORLAR', module: 'module.reports', keywords: 'kdv vergi' },
+    { label: 'Alacak Raporu', href: '/accounting/reports/receivable', section: 'RAPORLAR', module: 'module.reports', keywords: 'alacak' },
+    { label: 'Borç Raporu', href: '/accounting/reports/payable', section: 'RAPORLAR', module: 'module.reports', keywords: 'borç' },
 
     // Other
-    { label: 'Stok & Maliyet', href: '/inventory', section: 'DİĞER', shortcut: ['G', 'I'], keywords: 'stok depo envanter' },
-    { label: 'Şantiye İlerleme', href: '/site-progress', section: 'DİĞER', shortcut: ['G', 'X'], keywords: 'şantiye inşaat ilerleme' },
-    { label: 'Raporlar', href: '/reports', section: 'DİĞER', keywords: 'rapor' },
-    { label: 'Sistem Ayarları', href: '/settings', section: 'DİĞER', shortcut: ['G', 'Y'], keywords: 'ayar sistem' },
-    { label: 'Şablon Editörü', href: '/settings/templates', section: 'DİĞER', keywords: 'şablon template' },
+    { label: 'Stok & Maliyet', href: '/inventory', section: 'DİĞER', module: 'module.stock', shortcut: ['G', 'I'], keywords: 'stok depo envanter' },
+    { label: 'Şantiye İlerleme', href: '/site-progress', section: 'DİĞER', module: 'module.site', shortcut: ['G', 'X'], keywords: 'şantiye inşaat ilerleme' },
+    { label: 'Raporlar', href: '/reports', section: 'DİĞER', module: 'module.reports', keywords: 'rapor' },
+    { label: 'Sistem Ayarları', href: '/settings', section: 'DİĞER', module: 'module.settings', shortcut: ['G', 'Y'], keywords: 'ayar sistem' },
+    { label: 'Şablon Editörü', href: '/settings/templates', section: 'DİĞER', module: 'module.settings', keywords: 'şablon template' },
 ];
 
 // ─── Shortcut badge ───────────────────────────────────────────────────────────
@@ -69,6 +72,19 @@ interface Props {
 
 export function CommandPalette({ open, onClose }: Props) {
     const router = useRouter();
+    const user = useAuthStore(s => s.user);
+    const isAdmin = user?.roles?.some(r => r.name === 'Admin') ?? false;
+    const modules = user?.modules;
+
+    const allowedCommands = useMemo(() => {
+        return COMMANDS.filter(c => {
+            if (!c.module) return true;
+            if (isAdmin) return true;
+            if (!Array.isArray(modules)) return true;
+            return modules.includes(c.module);
+        });
+    }, [isAdmin, modules]);
+
     const [query, setQuery] = useState('');
     const [activeIdx, setActiveIdx] = useState(0);
     const inputRef = useRef<HTMLInputElement>(null);
@@ -76,15 +92,15 @@ export function CommandPalette({ open, onClose }: Props) {
 
     // Filter
     const filtered = useMemo(() => {
-        if (!query.trim()) return COMMANDS;
+        if (!query.trim()) return allowedCommands;
         const q = query.toLowerCase();
-        return COMMANDS.filter(c =>
+        return allowedCommands.filter(c =>
             c.label.toLowerCase().includes(q) ||
             c.section.toLowerCase().includes(q) ||
             (c.keywords || '').toLowerCase().includes(q) ||
             (c.href || '').toLowerCase().includes(q)
         );
-    }, [query]);
+    }, [query, allowedCommands]);
 
     // Group by section
     const grouped = useMemo(() => {
