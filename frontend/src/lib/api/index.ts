@@ -25,6 +25,18 @@ api.interceptors.request.use((config) => {
         console.error("Error reading token from local storage", error);
     }
 
+    try {
+        const projectStorage = localStorage.getItem('project-storage');
+        if (projectStorage) {
+            const { state } = JSON.parse(projectStorage);
+            if (state?.activeProject?.id) {
+                config.headers['X-Project-Id'] = state.activeProject.id;
+            }
+        }
+    } catch (error) {
+        console.error("Error reading project from local storage", error);
+    }
+
     return config;
 });
 
