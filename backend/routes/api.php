@@ -42,6 +42,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('roles', [UserController::class, 'roles']);
     Route::put('roles/{id}/permissions', [UserController::class, 'updateRolePermissions']);
     Route::post('roles/init-defaults', [UserController::class, 'initRoleDefaults']);
+    Route::get('users/{id}/projects', [UserController::class, 'getUserProjects']);
+    Route::put('users/{id}/projects', [UserController::class, 'updateUserProjects']);
 
     // Proje Yönetimi
     Route::post('projects/{id}/logo', [ProjectController::class, 'uploadLogo']);

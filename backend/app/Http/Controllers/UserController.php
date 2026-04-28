@@ -166,6 +166,38 @@ class UserController extends Controller
         return response()->json(['message' => 'Varsayılan rol izinleri uygulandı.']);
     }
 
+    // ─── User Projects ───────────────────────────────────────────────────────────
+
+    public function getUserProjects(Request $request, string $id)
+    {
+        $this->adminOnly($request);
+        $user = User::findOrFail($id);
+        $allProjects = \App\Models\Project::orderBy('name')->get(['id', 'name']);
+        $assignedIds = $user->projects()->pluck('projects.id')->toArray();
+
+        return response()->json([
+            'data' => $allProjects->map(fn($p) => [
+                'id'       => $p->id,
+                'name'     => $p->name,
+                'assigned' => in_array($p->id, $assignedIds),
+            ]),
+        ]);
+    }
+
+    public function updateUserProjects(Request $request, string $id)
+    {
+        $this->adminOnly($request);
+        $data = $request->validate([
+            'project_ids'   => 'required|array',
+            'project_ids.*' => 'integer|exists:projects,id',
+        ]);
+
+        $user = User::findOrFail($id);
+        $user->projects()->sync($data['project_ids']);
+
+        return response()->json(['message' => 'Proje ataması güncellendi.']);
+    }
+
     // ─── Helpers ─────────────────────────────────────────────────────────────────
 
     private function adminOnly(Request $request): void

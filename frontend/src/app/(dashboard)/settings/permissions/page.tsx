@@ -4,7 +4,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import {
     ChevronLeft, Plus, Edit2, Trash2, Shield, Users, Check,
-    X, Eye, EyeOff, Save, RefreshCw, AlertTriangle, User,
+    X, Eye, EyeOff, Save, RefreshCw, AlertTriangle, User, FolderOpen,
 } from 'lucide-react';
 import api from '@/lib/api';
 import { toast } from 'sonner';
@@ -19,6 +19,12 @@ interface UserRow {
     role?: string;
     projects_count: number;
     created_at: string;
+}
+
+interface ProjectOption {
+    id: number;
+    name: string;
+    assigned: boolean;
 }
 
 interface RoleRow {
@@ -62,6 +68,7 @@ function UserModal({ user, roles, onClose, onSaved }: {
     onClose: () => void;
     onSaved: () => void;
 }) {
+    const [modalTab, setModalTab] = useState<'info' | 'projects'>('info');
     const [form, setForm] = useState({
         name: user?.name ?? '',
         email: user?.email ?? '',
@@ -70,7 +77,38 @@ function UserModal({ user, roles, onClose, onSaved }: {
     });
     const [showPwd, setShowPwd] = useState(false);
     const [saving, setSaving] = useState(false);
+    const [projects, setProjects] = useState<ProjectOption[]>([]);
+    const [projectsLoading, setProjectsLoading] = useState(false);
+    const [savingProjects, setSavingProjects] = useState(false);
     const set = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }));
+
+    useEffect(() => {
+        if (!user) return;
+        setProjectsLoading(true);
+        api.get(`/users/${user.id}/projects`)
+            .then(r => setProjects(r.data.data ?? []))
+            .catch(() => toast.error('Projeler yüklenemedi'))
+            .finally(() => setProjectsLoading(false));
+    }, [user]);
+
+    const toggleProject = (id: number) => {
+        setProjects(prev => prev.map(p => p.id === id ? { ...p, assigned: !p.assigned } : p));
+    };
+
+    const handleSaveProjects = async () => {
+        if (!user) return;
+        setSavingProjects(true);
+        try {
+            const ids = projects.filter(p => p.assigned).map(p => p.id);
+            await api.put(`/users/${user.id}/projects`, { project_ids: ids });
+            toast.success('Proje ataması güncellendi');
+            onSaved();
+        } catch (err: any) {
+            toast.error(err?.response?.data?.message ?? 'Kaydedilemedi');
+        } finally {
+            setSavingProjects(false);
+        }
+    };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -99,12 +137,12 @@ function UserModal({ user, roles, onClose, onSaved }: {
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
-            <form
-                className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-4"
+            <div
+                className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden"
                 onClick={e => e.stopPropagation()}
-                onSubmit={handleSubmit}
             >
-                <div className="flex items-center justify-between">
+                {/* Modal Header */}
+                <div className="flex items-center justify-between px-6 pt-5 pb-3">
                     <h2 className="text-sm font-semibold text-slate-800 flex items-center gap-2">
                         <User className="w-4 h-4 text-blue-500" />
                         {user ? 'Kullanıcı Düzenle' : 'Yeni Kullanıcı Ekle'}
@@ -112,61 +150,121 @@ function UserModal({ user, roles, onClose, onSaved }: {
                     <button type="button" onClick={onClose}><X className="w-4 h-4 text-slate-400" /></button>
                 </div>
 
-                <div className="space-y-3">
-                    <label className="flex flex-col gap-1">
-                        <span className="text-[10px] text-slate-400 uppercase font-semibold">Ad Soyad *</span>
-                        <input required className={inputCls} value={form.name} onChange={e => set('name', e.target.value)} placeholder="Ahmet Yılmaz" />
-                    </label>
-                    <label className="flex flex-col gap-1">
-                        <span className="text-[10px] text-slate-400 uppercase font-semibold">E-posta *</span>
-                        <input required type="email" className={inputCls} value={form.email} onChange={e => set('email', e.target.value)} placeholder="kullanici@firma.com" />
-                    </label>
-                    <label className="flex flex-col gap-1">
-                        <span className="text-[10px] text-slate-400 uppercase font-semibold">Rol *</span>
-                        <select required className={inputCls} value={form.role} onChange={e => set('role', e.target.value)}>
-                            {roles.map(r => <option key={r.id} value={r.name}>{r.name}</option>)}
-                        </select>
-                    </label>
-                    <label className="flex flex-col gap-1">
-                        <span className="text-[10px] text-slate-400 uppercase font-semibold">
-                            Şifre {user ? '(boş bırakırsanız değişmez)' : '*'}
-                        </span>
-                        <div className="relative">
-                            <input
-                                type={showPwd ? 'text' : 'password'}
-                                className={inputCls + ' pr-10'}
-                                value={form.password}
-                                onChange={e => set('password', e.target.value)}
-                                placeholder="••••••••"
-                            />
-                            <button type="button" onClick={() => setShowPwd(v => !v)} className="absolute right-2.5 top-2.5 text-slate-400">
-                                {showPwd ? <EyeOff size={14} /> : <Eye size={14} />}
-                            </button>
-                        </div>
-                    </label>
-                </div>
-
-                {form.role && MODULE_META.length > 0 && (
-                    <div className="bg-slate-50 rounded-lg p-3 border border-slate-100">
-                        <p className="text-[10px] font-semibold text-slate-400 uppercase mb-2">Bu rolün erişimi</p>
-                        <div className="flex flex-wrap gap-1.5">
-                            {roles.find(r => r.name === form.role)?.permissions.map(p => {
-                                const m = MODULE_META.find(mm => mm.key === p);
-                                return m ? (
-                                    <span key={p} className="text-[10px] bg-blue-50 text-blue-700 border border-blue-100 rounded px-2 py-0.5">{m.label}</span>
-                                ) : null;
-                            })}
-                        </div>
+                {/* Tabs (sadece düzenlemede göster) */}
+                {user && (
+                    <div className="flex border-b border-slate-100 px-6">
+                        <button
+                            onClick={() => setModalTab('info')}
+                            className={`flex items-center gap-1.5 px-3 py-2 text-xs font-medium border-b-2 transition-colors -mb-px ${modalTab === 'info' ? 'border-blue-500 text-blue-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}
+                        >
+                            <User size={12} /> Bilgiler
+                        </button>
+                        <button
+                            onClick={() => setModalTab('projects')}
+                            className={`flex items-center gap-1.5 px-3 py-2 text-xs font-medium border-b-2 transition-colors -mb-px ${modalTab === 'projects' ? 'border-blue-500 text-blue-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}
+                        >
+                            <FolderOpen size={12} /> Projeler
+                        </button>
                     </div>
                 )}
 
-                <div className="flex gap-2 pt-1">
-                    <button type="button" onClick={onClose} className="flex-1 py-2 text-xs font-medium text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50">İptal</button>
-                    <button type="submit" disabled={saving} className="flex-1 py-2 text-xs font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50">
-                        {saving ? 'Kaydediliyor...' : (user ? 'Güncelle' : 'Oluştur')}
-                    </button>
-                </div>
-            </form>
+                {/* Info Tab */}
+                {modalTab === 'info' && (
+                    <form className="p-6 pt-4 space-y-4" onSubmit={handleSubmit}>
+                        <div className="space-y-3">
+                            <label className="flex flex-col gap-1">
+                                <span className="text-[10px] text-slate-400 uppercase font-semibold">Ad Soyad *</span>
+                                <input required className={inputCls} value={form.name} onChange={e => set('name', e.target.value)} placeholder="Ahmet Yılmaz" />
+                            </label>
+                            <label className="flex flex-col gap-1">
+                                <span className="text-[10px] text-slate-400 uppercase font-semibold">E-posta *</span>
+                                <input required type="email" className={inputCls} value={form.email} onChange={e => set('email', e.target.value)} placeholder="kullanici@firma.com" />
+                            </label>
+                            <label className="flex flex-col gap-1">
+                                <span className="text-[10px] text-slate-400 uppercase font-semibold">Rol *</span>
+                                <select required className={inputCls} value={form.role} onChange={e => set('role', e.target.value)}>
+                                    {roles.map(r => <option key={r.id} value={r.name}>{r.name}</option>)}
+                                </select>
+                            </label>
+                            <label className="flex flex-col gap-1">
+                                <span className="text-[10px] text-slate-400 uppercase font-semibold">
+                                    Şifre {user ? '(boş bırakırsanız değişmez)' : '*'}
+                                </span>
+                                <div className="relative">
+                                    <input
+                                        type={showPwd ? 'text' : 'password'}
+                                        className={inputCls + ' pr-10'}
+                                        value={form.password}
+                                        onChange={e => set('password', e.target.value)}
+                                        placeholder="••••••••"
+                                    />
+                                    <button type="button" onClick={() => setShowPwd(v => !v)} className="absolute right-2.5 top-2.5 text-slate-400">
+                                        {showPwd ? <EyeOff size={14} /> : <Eye size={14} />}
+                                    </button>
+                                </div>
+                            </label>
+                        </div>
+
+                        {form.role && MODULE_META.length > 0 && (
+                            <div className="bg-slate-50 rounded-lg p-3 border border-slate-100">
+                                <p className="text-[10px] font-semibold text-slate-400 uppercase mb-2">Bu rolün erişimi</p>
+                                <div className="flex flex-wrap gap-1.5">
+                                    {roles.find(r => r.name === form.role)?.permissions.map(p => {
+                                        const m = MODULE_META.find(mm => mm.key === p);
+                                        return m ? (
+                                            <span key={p} className="text-[10px] bg-blue-50 text-blue-700 border border-blue-100 rounded px-2 py-0.5">{m.label}</span>
+                                        ) : null;
+                                    })}
+                                </div>
+                            </div>
+                        )}
+
+                        <div className="flex gap-2 pt-1">
+                            <button type="button" onClick={onClose} className="flex-1 py-2 text-xs font-medium text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50">İptal</button>
+                            <button type="submit" disabled={saving} className="flex-1 py-2 text-xs font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50">
+                                {saving ? 'Kaydediliyor...' : (user ? 'Güncelle' : 'Oluştur')}
+                            </button>
+                        </div>
+                    </form>
+                )}
+
+                {/* Projects Tab */}
+                {modalTab === 'projects' && (
+                    <div className="p-6 pt-4 space-y-4">
+                        <p className="text-xs text-slate-400">Kullanıcının erişebileceği projeleri seçin.</p>
+                        {projectsLoading ? (
+                            <div className="text-center py-8 text-sm text-slate-400">Yükleniyor...</div>
+                        ) : projects.length === 0 ? (
+                            <div className="text-center py-8 text-sm text-slate-400">Henüz proje yok</div>
+                        ) : (
+                            <div className="space-y-1 max-h-64 overflow-y-auto">
+                                {projects.map(p => (
+                                    <label key={p.id} className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-slate-50 cursor-pointer">
+                                        <div
+                                            className={`w-5 h-5 rounded flex items-center justify-center shrink-0 border-2 transition-colors ${p.assigned ? 'bg-blue-600 border-blue-600' : 'border-slate-200 bg-white'}`}
+                                            onClick={() => toggleProject(p.id)}
+                                        >
+                                            {p.assigned && <Check size={12} className="text-white" strokeWidth={3} />}
+                                        </div>
+                                        <span className="text-sm text-slate-700">{p.name}</span>
+                                    </label>
+                                ))}
+                            </div>
+                        )}
+                        <div className="flex gap-2 pt-1">
+                            <button type="button" onClick={onClose} className="flex-1 py-2 text-xs font-medium text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50">İptal</button>
+                            <button
+                                type="button"
+                                onClick={handleSaveProjects}
+                                disabled={savingProjects || projectsLoading}
+                                className="flex-1 py-2 text-xs font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                            >
+                                {savingProjects ? 'Kaydediliyor...' : 'Kaydet'}
+                            </button>
+                        </div>
+                    </div>
+                )}
+            </div>
         </div>
     );
 }
