@@ -331,9 +331,10 @@ interface ProfileDropdownProps {
   user: { name: string; email: string; roles?: { name: string }[] } | null;
   onClose: () => void;
   onLogout: () => void;
+  anchorRect?: DOMRect;
 }
 
-function ProfileDropdown({ user, onClose, onLogout }: ProfileDropdownProps) {
+function ProfileDropdown({ user, onClose, onLogout, anchorRect }: ProfileDropdownProps) {
   const router = useRouter();
   const ref = useRef<HTMLDivElement>(null);
 
@@ -355,10 +356,14 @@ function ProfileDropdown({ user, onClose, onLogout }: ProfileDropdownProps) {
 
   function nav(href: string) { router.push(href); onClose(); }
 
-  return (
+  const top = anchorRect ? anchorRect.bottom + 8 : 60;
+  const right = anchorRect ? window.innerWidth - anchorRect.right : 8;
+
+  return ReactDOM.createPortal(
     <div
       ref={ref}
-      className="absolute top-[calc(100%+8px)] right-0 w-56 bg-white border border-slate-200 rounded-lg shadow-xl z-[200] overflow-hidden"
+      style={{ top, right }}
+      className="fixed w-56 bg-white border border-slate-200 rounded-lg shadow-xl z-[999] overflow-hidden"
     >
       <div className="px-4 py-3 border-b border-slate-100 bg-slate-50">
         <div className="flex items-center gap-2.5">
@@ -392,7 +397,8 @@ function ProfileDropdown({ user, onClose, onLogout }: ProfileDropdownProps) {
           <LogOut size={14} /> Çıkış Yap
         </button>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 
@@ -432,6 +438,8 @@ export function Topbar() {
   const [profileOpen, setProfileOpen] = useState(false);
   const [bellRect, setBellRect] = useState<DOMRect | undefined>();
   const bellRef = useRef<HTMLButtonElement>(null);
+  const [profileRect, setProfileRect] = useState<DOMRect | undefined>();
+  const profileBtnRef = useRef<HTMLButtonElement>(null);
 
   const badgeCount = useBellBadge(activeProject?.id);
 
@@ -456,7 +464,7 @@ export function Topbar() {
 
   return (
     <>
-      <header className="h-[52px] flex items-center justify-between px-3 bg-primary text-white shadow-sm shrink-0 gap-2 overflow-hidden relative z-40">
+      <header className="h-[52px] flex items-center justify-between px-3 bg-primary text-white shadow-sm shrink-0 gap-2 relative z-40">
         {/* Left */}
         <div className="flex items-center gap-2 min-w-0 flex-1">
           <button
@@ -532,7 +540,12 @@ export function Topbar() {
           {/* Profile */}
           <div className="relative ml-1 border-l border-white/10 pl-1">
             <button
-              onClick={() => { setProfileOpen((v) => !v); setNotifOpen(false); }}
+              ref={profileBtnRef}
+              onClick={() => {
+                setProfileRect(profileBtnRef.current?.getBoundingClientRect());
+                setProfileOpen((v) => !v);
+                setNotifOpen(false);
+              }}
               className="flex items-center gap-1.5 hover:bg-white/20 p-1 pl-1.5 pr-2 rounded transition-colors"
             >
               <div className="w-7 h-7 rounded-full bg-white/20 border border-white/30 flex items-center justify-center text-xs font-bold">
@@ -552,6 +565,7 @@ export function Topbar() {
                 user={user}
                 onClose={() => setProfileOpen(false)}
                 onLogout={handleLogout}
+                anchorRect={profileRect}
               />
             )}
           </div>
