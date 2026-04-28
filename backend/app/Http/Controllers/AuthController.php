@@ -42,8 +42,15 @@ class AuthController extends Controller
 
     public function me(Request $request)
     {
+        $user = $request->user()->load('roles');
+        $modules = $user->hasRole('Admin')
+            ? \App\Http\Controllers\UserController::MODULES
+            : $user->getAllPermissions()->pluck('name')
+                ->filter(fn($p) => str_starts_with($p, 'module.'))->values()->toArray();
+
         return response()->json([
-            'user' => $request->user()->load('roles')
+            'user'    => $user,
+            'modules' => $modules,
         ]);
     }
 

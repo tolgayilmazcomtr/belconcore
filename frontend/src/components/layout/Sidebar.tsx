@@ -12,6 +12,7 @@ import {
   Menu, X, ChevronRight, Search, Box, Hammer
 } from "lucide-react";
 import { CommandPalette, COMMANDS } from "./CommandPalette";
+import { useAuthStore } from "@/store/useAuthStore";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface NavChild {
@@ -30,6 +31,7 @@ interface NavEntry {
   href: string;
   icon: React.ReactNode;
   exact?: boolean;
+  module?: string; // e.g. 'module.crm'
   children?: (NavChild | NavSection)[];
 }
 
@@ -39,9 +41,9 @@ function isNavSection(item: NavChild | NavSection): item is NavSection {
 
 // ─── NAV CONFIG ───────────────────────────────────────────────────────────────
 const NAV: NavEntry[] = [
-  { label: "Dashboard", href: "/", icon: <LayoutDashboard size={17} />, exact: true },
+  { label: "Dashboard", href: "/", icon: <LayoutDashboard size={17} />, exact: true, module: "module.dashboard" },
   {
-    label: "Proje Yönetimi", href: "/projects", icon: <Building2 size={17} />,
+    label: "Proje Yönetimi", href: "/projects", icon: <Building2 size={17} />, module: "module.projects",
     children: [
       { label: "Tüm Projeler", href: "/projects", icon: <Building2 size={13} /> },
       { label: "Bloklar / Binalar", href: "/blocks", icon: <Building size={13} /> },
@@ -50,7 +52,7 @@ const NAV: NavEntry[] = [
     ],
   },
   {
-    label: "CRM & Satış", href: "/crm", icon: <Users size={17} />,
+    label: "CRM & Satış", href: "/crm", icon: <Users size={17} />, module: "module.crm",
     children: [
       { label: "Müşteriler", href: "/customers", icon: <Users size={13} /> },
       { label: "Fırsatlar", href: "/crm", exact: true, icon: <PieChart size={13} /> },
@@ -58,7 +60,7 @@ const NAV: NavEntry[] = [
     ],
   },
   {
-    label: "Ön Muhasebe", href: "/accounting", icon: <WalletCards size={17} />,
+    label: "Ön Muhasebe", href: "/accounting", icon: <WalletCards size={17} />, module: "module.accounting",
     children: [
       { label: "Genel Bakış", href: "/accounting", exact: true, icon: <BarChart2 size={13} /> },
       {
@@ -92,11 +94,11 @@ const NAV: NavEntry[] = [
       },
     ],
   },
-  { label: "Stok & Maliyet", href: "/inventory", icon: <Warehouse size={17} /> },
-  { label: "Şantiye İlerleme", href: "/site-progress", icon: <HardHat size={17} /> },
-  { label: "Raporlar", href: "/reports", icon: <PieChart size={17} /> },
+  { label: "Stok & Maliyet", href: "/inventory", icon: <Warehouse size={17} />, module: "module.stock" },
+  { label: "Şantiye İlerleme", href: "/site-progress", icon: <HardHat size={17} />, module: "module.site" },
+  { label: "Raporlar", href: "/reports", icon: <PieChart size={17} />, module: "module.reports" },
   {
-    label: "Sistem Ayarları", href: "/settings", icon: <Settings2 size={17} />,
+    label: "Sistem Ayarları", href: "/settings", icon: <Settings2 size={17} />, module: "module.settings",
     children: [
       { label: "Şablon Editörü", href: "/settings/templates", icon: <LayoutTemplate size={13} /> },
     ],
@@ -313,6 +315,14 @@ export function Sidebar() {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const user = useAuthStore(s => s.user);
+
+  const isAdmin = user?.roles?.some(r => r.name === 'Admin') ?? false;
+  const visibleNav = NAV.filter(entry => {
+    if (!entry.module) return true; // always show entries without module requirement
+    if (isAdmin) return true;
+    return user?.modules?.includes(entry.module) ?? false;
+  });
 
   useKeyboardShortcuts(() => setPaletteOpen(true));
 
@@ -371,7 +381,7 @@ export function Sidebar() {
 
       {/* Nav */}
       <nav className={`flex-1 overflow-y-auto py-2 space-y-0.5 ${collapsed && !isMobile ? "px-1.5" : "px-2"}`}>
-        {NAV.map((entry, i) => (
+        {visibleNav.map((entry, i) => (
           <NavItemRow key={i} entry={entry} collapsed={collapsed && !isMobile} />
         ))}
       </nav>

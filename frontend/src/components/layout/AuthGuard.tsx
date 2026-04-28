@@ -3,49 +3,49 @@
 import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { useAuthStore } from "@/store/useAuthStore";
+import api from "@/lib/api";
 
 const publicRoutes = ["/login"];
 
 export function AuthGuard({ children }: { children: React.ReactNode }) {
     const router = useRouter();
     const pathname = usePathname();
-    const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
-
-    // To avoid hydration mismatch, delay render until auth state is checked
+    const { isAuthenticated, setUser, token } = useAuthStore();
     const [isReady, setIsReady] = useState(false);
 
     useEffect(() => {
-        // Run once on mount to handle hydration
-        // eslint-disable-next-line react-hooks/set-state-in-effect
         setIsReady(true);
     }, []);
 
+    // Refresh user data (including modules) when authenticated
+    useEffect(() => {
+        if (!isAuthenticated || !token) return;
+        api.get("/me").then(res => {
+            if (res.data?.user) {
+                setUser({ ...res.data.user, modules: res.data.modules ?? [] });
+            }
+        }).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isAuthenticated, token]);
+
     useEffect(() => {
         if (!isReady) return;
-
-        // Check if the route is public
         const isPublicRoute = publicRoutes.includes(pathname);
-
         if (!isAuthenticated && !isPublicRoute) {
-            // Redirect unauthenticated user to login area
             router.replace("/login");
         } else if (isAuthenticated && isPublicRoute) {
-            // Redirect authenticated user away from login
             router.replace("/");
         }
     }, [isAuthenticated, pathname, router, isReady]);
 
-    // Handle loading state to prevent flash of content
     if (!isReady) {
         return (
             <div className="min-h-screen flex items-center justify-center bg-background">
-                <div className="w-8 h-8 rounded-full border-4 border-primary border-t-transparent animate-spin"></div>
+                <div className="w-8 h-8 rounded-full border-4 border-primary border-t-transparent animate-spin" />
             </div>
         );
     }
 
-    // Hide protected content if user is unauthenticated and on a protected route
-    // (the router.replace above will trigger navigation shortly)
     if (!isAuthenticated && !publicRoutes.includes(pathname)) {
         return null;
     }

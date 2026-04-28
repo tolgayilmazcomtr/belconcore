@@ -20,6 +20,7 @@ use App\Http\Controllers\CostItemController;
 use App\Http\Controllers\CheckController;
 use App\Http\Controllers\ContractController;
 use App\Http\Controllers\StockController;
+use App\Http\Controllers\UserController;
 
 // Public Auth Routes
 Route::post('/login', [AuthController::class, 'login']);
@@ -32,6 +33,15 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/user', function (Request $request) {
         return $request->user();
     });
+
+    // Kullanıcı & Rol Yönetimi (Admin only - controller içinde kontrol edilir)
+    Route::get('users', [UserController::class, 'index']);
+    Route::post('users', [UserController::class, 'store']);
+    Route::put('users/{id}', [UserController::class, 'update']);
+    Route::delete('users/{id}', [UserController::class, 'destroy']);
+    Route::get('roles', [UserController::class, 'roles']);
+    Route::put('roles/{id}/permissions', [UserController::class, 'updateRolePermissions']);
+    Route::post('roles/init-defaults', [UserController::class, 'initRoleDefaults']);
 
     // Proje Yönetimi
     Route::post('projects/{id}/logo', [ProjectController::class, 'uploadLogo']);
