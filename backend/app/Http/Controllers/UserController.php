@@ -72,6 +72,10 @@ class UserController extends Controller
         ]);
         $user->syncRoles([$data['role']]);
 
+        // Tüm mevcut projelere ata (project.access middleware için gerekli)
+        $projectIds = \App\Models\Project::pluck('id');
+        $user->projects()->sync($projectIds);
+
         return response()->json([
             'message' => 'Kullanıcı oluşturuldu.',
             'data'    => ['id' => $user->id, 'name' => $user->name, 'email' => $user->email, 'role' => $data['role']],
