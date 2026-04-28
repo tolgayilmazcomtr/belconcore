@@ -21,6 +21,7 @@ use App\Http\Controllers\CheckController;
 use App\Http\Controllers\ContractController;
 use App\Http\Controllers\StockController;
 use App\Http\Controllers\UserController;
+use App\Http\Controllers\SiteProgressController;
 
 // Public Auth Routes
 Route::post('/login', [AuthController::class, 'login']);
@@ -95,6 +96,12 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('contracts/{contract}/installments/{installment}/invoice', [ContractController::class, 'invoiceInstallment']);
         Route::post('contracts/{contract}/document', [ContractController::class, 'uploadDocument']);
         Route::delete('contracts/{contract}/document', [ContractController::class, 'deleteDocument']);
+
+        // Şantiye İlerleme
+        Route::get('site-progress',        [SiteProgressController::class, 'index']);
+        Route::post('site-progress',       [SiteProgressController::class, 'store']);
+        Route::put('site-progress/{id}',   [SiteProgressController::class, 'update']);
+        Route::delete('site-progress/{id}',[SiteProgressController::class, 'destroy']);
 
         // Çek & Senet Yönetimi
         Route::get('checks/summary',  [CheckController::class, 'summary']);
