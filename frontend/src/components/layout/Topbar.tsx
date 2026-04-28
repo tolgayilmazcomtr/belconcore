@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef, useCallback } from "react";
+import ReactDOM from "react-dom";
 import {
   Bell, Search, UserCircle, Settings, LogOut, Menu,
   AlertTriangle, Clock, CheckCircle2, ChevronRight, X,
@@ -115,9 +116,10 @@ function SnoozeMenu({ onSnooze, onClose }: { onSnooze: (days: number) => void; o
 interface NotifPanelProps {
   onClose: () => void;
   projectId?: number;
+  anchorRect?: DOMRect;
 }
 
-function NotifPanel({ onClose, projectId }: NotifPanelProps) {
+function NotifPanel({ onClose, projectId, anchorRect }: NotifPanelProps) {
   const router = useRouter();
   const [contractData, setContractData] = useState<NotifSummary | null>(null);
   const [checkReminders, setCheckReminders] = useState<CheckReminder[]>([]);
@@ -165,11 +167,16 @@ function NotifPanel({ onClose, projectId }: NotifPanelProps) {
   const contractBadge = contractData ? contractData.overdue_count + contractData.due_in_7_count : 0;
   const totalBadge = contractBadge + visibleChecks.length;
 
-  return (
+  const top = anchorRect ? anchorRect.bottom + 8 : 60;
+  const right = anchorRect ? window.innerWidth - anchorRect.right : 8;
+
+  return ReactDOM.createPortal(
     <div
       ref={panelRef}
-      className="absolute top-[calc(100%+8px)] right-0 w-80 bg-white border border-slate-200 rounded-lg shadow-xl z-[200] overflow-hidden"
+      style={{ top, right }}
+      className="fixed w-80 bg-white border border-slate-200 rounded-lg shadow-xl z-[999] overflow-hidden"
     >
+
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100">
         <div className="flex items-center gap-2">
@@ -313,7 +320,8 @@ function NotifPanel({ onClose, projectId }: NotifPanelProps) {
           Çek & Senet <ChevronRight size={12} />
         </button>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 
@@ -422,6 +430,8 @@ export function Topbar() {
   const [cmdOpen, setCmdOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [bellRect, setBellRect] = useState<DOMRect | undefined>();
+  const bellRef = useRef<HTMLButtonElement>(null);
 
   const badgeCount = useBellBadge(activeProject?.id);
 
@@ -488,7 +498,12 @@ export function Topbar() {
           {/* Notifications */}
           <div className="relative">
             <button
-              onClick={() => { setNotifOpen((v) => !v); setProfileOpen(false); }}
+              ref={bellRef}
+              onClick={() => {
+                setBellRect(bellRef.current?.getBoundingClientRect());
+                setNotifOpen((v) => !v);
+                setProfileOpen(false);
+              }}
               className="relative p-1.5 rounded hover:bg-white/20 transition-colors"
               aria-label="Bildirimler"
             >
@@ -501,6 +516,7 @@ export function Topbar() {
               <NotifPanel
                 onClose={() => setNotifOpen(false)}
                 projectId={activeProject?.id}
+                anchorRect={bellRect}
               />
             )}
           </div>
