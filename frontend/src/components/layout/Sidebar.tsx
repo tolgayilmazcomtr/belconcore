@@ -318,10 +318,12 @@ export function Sidebar() {
   const user = useAuthStore(s => s.user);
 
   const isAdmin = user?.roles?.some(r => r.name === 'Admin') ?? false;
+  const modulesLoaded = Array.isArray(user?.modules);
   const visibleNav = NAV.filter(entry => {
-    if (!entry.module) return true; // always show entries without module requirement
+    if (!entry.module) return true;
     if (isAdmin) return true;
-    return user?.modules?.includes(entry.module) ?? false;
+    if (!modulesLoaded) return true; // modules not yet fetched — show all to avoid blank sidebar
+    return user!.modules!.includes(entry.module);
   });
 
   useKeyboardShortcuts(() => setPaletteOpen(true));
