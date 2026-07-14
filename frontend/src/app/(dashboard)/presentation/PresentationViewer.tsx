@@ -1,0 +1,1011 @@
+"use client";
+
+import React, { useEffect, useRef, useState, useMemo, useCallback } from "react";
+import * as THREE from "three";
+import { X, Shield, Loader2, Maximize2, Minimize2, Tag } from "lucide-react";
+import { useProjectStore } from "@/store/useProjectStore";
+import api from "@/lib/api";
+import { Block } from "@/types/project.types";
+
+// ============================================================
+// Satış Sunum Ekranı (Müşteriye Dönük Dijital İkiz)
+//
+// Bu ekran müşterinin önünde açılır. Veri kaynağı /presentation/units
+// endpoint'idir; sahip/müşteri bilgisi sunucudan hiç gelmez.
+// Düzenleme, müşteri atama ve blok/etiket editörleri bilinçli olarak yoktur.
+// ============================================================
+type Status = 'available' | 'sold' | 'reserved' | 'not_for_sale';
+
+interface PresUnit {
+    id: number;
+    block_id: number;
+    unit_no: string;
+    floor_no?: string;
+    unit_type?: string;
+    gross_area?: number | string;
+    net_area?: number | string;
+    status: Status;
+    list_price?: number | string;
+}
+
+interface UnitData {
+    id: string;              // sahne kimliği: blokKodu+katTag+cephe
+    block: string;
+    fi: number;              // kat index
+    fl: string;              // kat tag ("Z", "1", "roof"...)
+    cephe: string;
+    status: Status;
+    unit_type?: string;
+    gross_area?: number;
+    net_area?: number;
+    list_price?: number;
+}
+
+const SC_HEX: Record<Status, number> = { available: 0x27AE60, sold: 0xC8102E, reserved: 0xE67E22, not_for_sale: 0x95A5A6 };
+const SC_CSS: Record<Status, string> = { available: '#27AE60', sold: '#C8102E', reserved: '#E67E22', not_for_sale: '#95A5A6' };
+const SL: Record<Status, string> = { available: 'Satışa Açık', sold: 'Satıldı', reserved: 'Rezerve', not_for_sale: 'Satışa Kapalı' };
+
+const fmtTL = (v?: number) =>
+    v == null ? null : new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY', maximumFractionDigits: 0 }).format(v);
+const fmtTLCompact = (v: number) =>
+    new Intl.NumberFormat('tr-TR', { notation: 'compact', maximumFractionDigits: 2 }).format(v) + ' ₺';
+
+// Fiyat, satılmış/kapalı dairelerde gösterilmez
+const priceVisibleFor = (s: Status) => s === 'available' || s === 'reserved';
+
+interface BlockSceneConfig {
+    block: Block;
+    floors: string[];
+    floorTags: string[];
+    faces: string[];
+    faceLabels: Record<string, string>;
+}
+
+function parseUnitNo(unit_no: string, blockCode: string): { floorTag: string; faceCode: string } | null {
+    if (!unit_no.startsWith(blockCode)) return null;
+    const rest = unit_no.slice(blockCode.length);
+    const m = rest.match(/^(-?\d+|Z|roof)(.+)$/);
+    if (!m) return null;
+    return { floorTag: m[1], faceCode: m[2] };
+}
+
+const floorLabel = (u: UnitData) => u.fl === 'Z' ? 'Zemin Kat' : u.fl === 'roof' ? 'Çatı Katı' : `${u.fl}. Kat`;
+
+// ============================================================
+// Main Component
+// ============================================================
+export default function PresentationViewer() {
+    const mountRef = useRef<HTMLDivElement>(null);
+    const wrapRef = useRef<HTMLDivElement>(null);
+    const [data, setData] = useState<Record<string, UnitData>>({});
+    const [blockConfigs, setBlockConfigs] = useState<BlockSceneConfig[]>([]);
+    const [camTheta, setCamTheta] = useState(-Math.PI * 0.75);
+    const [sceneLabels, setSceneLabels] = useState<Array<{ id?: number; text: string; x: number; z: number; rotation: number; color: string; scale: number }>>([]);
+
+    const { activeProject } = useProjectStore();
+
+    const [listFilter, setListFilter] = useState<Status | 'all'>('all');
+    const [selectedId, setSelectedId] = useState<string | null>(null);
+    const [hoverId, setHoverId] = useState<string | null>(null);
+    const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
+    const [isFetching, setIsFetching] = useState(true);
+    const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+    const [isFullscreen, setIsFullscreen] = useState(false);
+
+    // Fiyat etiketleri (sunum sırasında istenirse kapatılabilir)
+    const [showPrices, setShowPrices] = useState(true);
+    const showPricesRef = useRef(true);
+
+    const threeRef = useRef<{
+        setUnitHighlight: (id: string, on: boolean) => void;
+        refreshUnitLabel: (id: string) => void;
+        doZoom: (f: number) => void;
+        setView: (name: string) => void;
+    } | null>(null);
+
+    const camStateRef = useRef({ theta: -Math.PI * 0.75, phi: 0.75, r: 26, tx: 0, ty: 3, tz: 0 });
+
+    const togglePrices = () => {
+        showPricesRef.current = !showPricesRef.current;
+        setShowPrices(showPricesRef.current);
+        if (threeRef.current) {
+            Object.keys(data).forEach(id => threeRef.current?.refreshUnitLabel(id));
+        }
+    };
+
+    // ─── Tam ekran sunum modu ───
+    const toggleFullscreen = useCallback(() => {
+        if (!document.fullscreenElement) {
+            wrapRef.current?.requestFullscreen().catch(() => { });
+        } else {
+            document.exitFullscreen().catch(() => { });
+        }
+    }, []);
+
+    useEffect(() => {
+        const handler = () => setIsFullscreen(!!document.fullscreenElement);
+        document.addEventListener('fullscreenchange', handler);
+        return () => document.removeEventListener('fullscreenchange', handler);
+    }, []);
+
+    // ─── Veri yükleme (sanitize edilmiş sunum endpoint'i) ───
+    useEffect(() => {
+        if (!activeProject) { setIsFetching(false); return; }
+        setIsFetching(true);
+
+        const load = async () => {
+            try {
+                const blocksRes = await api.get('/blocks', { params: { active_project_id: activeProject.id } });
+                const blocks: Block[] = blocksRes.data?.data || blocksRes.data || [];
+
+                try {
+                    const labelsRes = await api.get('/scene-labels', { params: { active_project_id: activeProject.id } });
+                    setSceneLabels(labelsRes.data || []);
+                } catch { /* labels optional */ }
+
+                const unitsRes = await api.get('/presentation/units', { params: { active_project_id: activeProject.id } });
+                const serverUnits: PresUnit[] = unitsRes.data?.data || unitsRes.data || [];
+
+                const newData: Record<string, UnitData> = {};
+                const configs: BlockSceneConfig[] = [];
+
+                blocks.forEach(block => {
+                    const blockCode = block.code || block.name.charAt(0).toUpperCase();
+                    const blockUnits = serverUnits.filter(u => u.block_id === block.id);
+                    if (blockUnits.length === 0) return;
+
+                    const floorMap = new Map<string, string>();
+                    const faceSet = new Set<string>();
+                    const faceLabels: Record<string, string> = {};
+
+                    blockUnits.forEach(u => {
+                        const parsed = parseUnitNo(u.unit_no, blockCode);
+                        if (!parsed) return;
+                        if (!floorMap.has(parsed.floorTag)) {
+                            floorMap.set(parsed.floorTag, u.floor_no || parsed.floorTag);
+                        }
+                        faceSet.add(parsed.faceCode);
+                        if (!faceLabels[parsed.faceCode]) faceLabels[parsed.faceCode] = u.unit_no;
+                    });
+
+                    const sortedFloorTags = Array.from(floorMap.keys()).sort((a, b) => {
+                        const numA = a === 'Z' ? 0 : a === 'roof' ? 9999 : parseInt(a);
+                        const numB = b === 'Z' ? 0 : b === 'roof' ? 9999 : parseInt(b);
+                        return numA - numB;
+                    });
+
+                    const floors = sortedFloorTags.map(t => floorMap.get(t)!);
+                    const faceArray = Array.from(faceSet);
+                    let faces: string[];
+                    if (block.face_order && block.face_order.length > 0) {
+                        faces = block.face_order.filter(f => faceSet.has(f));
+                        faceArray.forEach(f => { if (!faces.includes(f)) faces.push(f); });
+                    } else {
+                        faces = faceArray;
+                    }
+
+                    configs.push({ block, floors, floorTags: sortedFloorTags, faces, faceLabels });
+
+                    sortedFloorTags.forEach((flTag, fi) => {
+                        faces.forEach(faceCode => {
+                            const unitId = `${blockCode}${flTag}${faceCode}`;
+                            const su = blockUnits.find(u => u.unit_no === unitId);
+                            newData[unitId] = {
+                                id: unitId,
+                                block: blockCode,
+                                fi,
+                                fl: flTag,
+                                cephe: faceLabels[faceCode] || faceCode,
+                                status: su ? (su.status as Status) : 'available',
+                                unit_type: su?.unit_type || undefined,
+                                gross_area: su?.gross_area != null ? Number(su.gross_area) : undefined,
+                                net_area: su?.net_area != null ? Number(su.net_area) : undefined,
+                                list_price: su?.list_price != null ? Number(su.list_price) : undefined,
+                            };
+                        });
+                    });
+                });
+
+                setBlockConfigs(configs);
+                setData(newData);
+            } catch (err) {
+                console.error('Sunum ekranı yükleme hatası', err);
+            } finally {
+                setIsFetching(false);
+            }
+        };
+
+        load();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [activeProject]);
+
+    // ============================================================
+    // THREE.js Initialization
+    // ============================================================
+    useEffect(() => {
+        if (!mountRef.current || Object.keys(data).length === 0) return;
+
+        let W = mountRef.current.clientWidth;
+        let H = mountRef.current.clientHeight;
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.setSize(W, H);
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFShadowMap;
+        renderer.setClearColor(0xECEEF2);
+        mountRef.current.appendChild(renderer.domElement);
+
+        const scene = new THREE.Scene();
+        scene.fog = new THREE.FogExp2(0xECEEF2, 0.012);
+
+        const camera = new THREE.PerspectiveCamera(42, W / H, 0.1, 300);
+
+        const amb = new THREE.AmbientLight(0xffffff, 0.6);
+        scene.add(amb);
+
+        const sun = new THREE.DirectionalLight(0xffffff, 0.85);
+        sun.position.set(-8, 18, -12);
+        sun.castShadow = true;
+        sun.shadow.camera.left = -20; sun.shadow.camera.right = 20;
+        sun.shadow.camera.top = 20; sun.shadow.camera.bottom = -20;
+        sun.shadow.mapSize.width = 2048; sun.shadow.mapSize.height = 2048;
+        scene.add(sun);
+
+        const fill = new THREE.DirectionalLight(0xddeeff, 0.2);
+        fill.position.set(10, 5, 10);
+        scene.add(fill);
+
+        const gGeo = new THREE.PlaneGeometry(100, 100);
+        const gMat = new THREE.MeshLambertMaterial({ color: 0xDFE3E8 });
+        const ground = new THREE.Mesh(gGeo, gMat);
+        ground.rotation.x = -Math.PI / 2;
+        ground.receiveShadow = true;
+        scene.add(ground);
+
+        const grid = new THREE.GridHelper(80, 40, 0xC8C8CC, 0xD8D8DC);
+        grid.position.y = 0.01;
+        scene.add(grid);
+
+        const UW = 2.0, UD = 2.0, UH = 0.9, UGAP = 0.14;
+
+        const unitGroups: Record<string, THREE.Group> = {};
+
+        function faceColor(hexInt: number, brightness: number) {
+            const r = (hexInt >> 16 & 0xff) / 255;
+            const g = (hexInt >> 8 & 0xff) / 255;
+            const b = (hexInt & 0xff) / 255;
+            return new THREE.Color(
+                Math.min(1, r * brightness),
+                Math.min(1, g * brightness),
+                Math.min(1, b * brightness)
+            );
+        }
+
+        // Kutu etiketi: daire no + (satışa açık/rezerve ise) liste fiyatı
+        function makeLabel(id: string, u: UnitData) {
+            const showPrice = showPricesRef.current && priceVisibleFor(u.status) && u.list_price != null;
+            const cvs2 = document.createElement('canvas');
+            cvs2.width = 256; cvs2.height = 64;
+            const ctx = cvs2.getContext('2d')!;
+            ctx.clearRect(0, 0, 256, 64);
+            ctx.fillStyle = 'rgba(255,255,255,0.95)';
+            ctx.font = 'bold 20px Montserrat,sans-serif';
+            ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+            ctx.fillText(id, 128, showPrice ? 20 : 32);
+            if (showPrice) {
+                ctx.font = 'bold 15px Montserrat,sans-serif';
+                ctx.fillStyle = 'rgba(255,244,200,0.96)';
+                ctx.fillText(fmtTLCompact(u.list_price!), 128, 44);
+            }
+            const tex = new THREE.CanvasTexture(cvs2);
+            const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: true });
+            const sp = new THREE.Sprite(mat);
+            sp.scale.set(UW * 0.95, UH * 0.6, 1);
+            sp.position.set(0, 0, UD / 2 + 0.15);
+            sp.userData.isLabel = true;
+            return sp;
+        }
+
+        function createUnitGroup(id: string) {
+            const u = data[id];
+            if (!u) return new THREE.Group();
+            const base = SC_HEX[u.status];
+            const group = new THREE.Group();
+            group.userData.unitID = id;
+
+            const geo = new THREE.BoxGeometry(UW, UH, UD);
+            const mats = [
+                new THREE.MeshLambertMaterial({ color: faceColor(base, 0.78) }),
+                new THREE.MeshLambertMaterial({ color: faceColor(base, 0.70) }),
+                new THREE.MeshLambertMaterial({ color: faceColor(base, 1.30) }),
+                new THREE.MeshLambertMaterial({ color: faceColor(base, 0.45) }),
+                new THREE.MeshLambertMaterial({ color: faceColor(base, 0.88) }),
+                new THREE.MeshLambertMaterial({ color: faceColor(base, 0.95) }),
+            ];
+
+            const mesh = new THREE.Mesh(geo, mats);
+            mesh.castShadow = true;
+            mesh.receiveShadow = true;
+            mesh.userData.unitID = id;
+            group.add(mesh);
+
+            const edges = new THREE.EdgesGeometry(geo);
+            const lineMat = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.25 });
+            const lines = new THREE.LineSegments(edges, lineMat);
+            lines.userData.isEdge = true;
+            group.add(lines);
+
+            group.add(makeLabel(id, u));
+
+            return group;
+        }
+
+        function makeTextSprite(text: string, color: string, scale: number) {
+            const c = document.createElement('canvas');
+            c.width = 512; c.height = 96;
+            const ctx = c.getContext('2d')!;
+            ctx.font = 'bold 40px Montserrat,sans-serif';
+            ctx.fillStyle = color || '#444';
+            ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+            ctx.fillText(text, 256, 48);
+            const tex = new THREE.CanvasTexture(c);
+            const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: true });
+            const sp = new THREE.Sprite(mat);
+            sp.scale.set((scale || 1) * 5.5, (scale || 1) * 1.0, 1);
+            return sp;
+        }
+
+        function buildBuildings() {
+            const stepX = UW + UGAP;
+            const stepZ = UD + UGAP;
+
+            blockConfigs.forEach(cfg => {
+                const bl = cfg.block;
+                const blockCode = bl.code || bl.name.charAt(0).toUpperCase();
+                const numFaces = cfg.faces.length;
+                const perRow = Math.max(1, bl.faces_per_row ?? numFaces);
+                const numCols = Math.min(perRow, numFaces);
+                const numRows = Math.ceil(numFaces / numCols);
+
+                const bx = bl.scene_x ?? 0;
+                const bz = bl.scene_z ?? 0;
+                const angleRad = ((bl.scene_angle ?? 0) * Math.PI) / 180;
+                const ca = Math.cos(angleRad);
+                const sa = Math.sin(angleRad);
+
+                const totalX = (numCols - 1) * stepX;
+                const totalZ = (numRows - 1) * stepZ;
+
+                cfg.floorTags.forEach((flTag, fi) => {
+                    const y = fi * (UH + UGAP) + UH / 2;
+                    cfg.faces.forEach((faceCode, fi2) => {
+                        const id = `${blockCode}${flTag}${faceCode}`;
+                        const col = fi2 % numCols;
+                        const row = Math.floor(fi2 / numCols);
+
+                        const lx = (col * stepX) - totalX / 2;
+                        const lz = (row * stepZ) - totalZ / 2;
+
+                        const ux = bx + lx * ca - lz * sa;
+                        const uz = bz + lx * sa + lz * ca;
+
+                        const g = createUnitGroup(id);
+                        g.position.set(ux, y, uz);
+                        g.rotation.y = -angleRad;
+                        g.userData.blockAngle = angleRad;
+                        scene.add(g);
+                        unitGroups[id] = g;
+                    });
+                });
+            });
+        }
+
+        function addLabels() {
+            function makeGroundLabel(text: string, color: string, scale: number) {
+                const c = document.createElement('canvas');
+                c.width = 1024; c.height = 256;
+                const ctx = c.getContext('2d')!;
+                ctx.font = 'bold 80px Montserrat,sans-serif';
+                ctx.fillStyle = color || '#444';
+                ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                ctx.fillText(text, 512, 128);
+                const tex = new THREE.CanvasTexture(c);
+                tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+                const mat = new THREE.MeshLambertMaterial({ map: tex, transparent: true, depthWrite: false });
+                const geo = new THREE.PlaneGeometry(scale * 8, scale * 2);
+                const mesh = new THREE.Mesh(geo, mat);
+                mesh.rotation.x = -Math.PI / 2;
+                return mesh;
+            }
+
+            blockConfigs.forEach(cfg => {
+                const bl = cfg.block;
+                const bx = bl.scene_x ?? 0;
+                const bz = bl.scene_z ?? 0;
+                const numFloors = cfg.floorTags.length;
+                const numFaces = cfg.faces.length;
+                const perRow = Math.max(1, bl.faces_per_row ?? numFaces);
+                const numCols = Math.min(perRow, numFaces);
+                const stX = UW + UGAP;
+
+                const lblBlock = makeTextSprite(bl.name.toUpperCase(), '#C8102E', 0.7);
+                lblBlock.position.set(bx, numFloors * (UH + UGAP) + 0.9, bz);
+                scene.add(lblBlock);
+
+                cfg.floorTags.forEach((flTag, fi) => {
+                    const label = flTag === 'Z' ? 'ZEMİN' : flTag === 'roof' ? 'ÇATI' : flTag + '.KAT';
+                    const sp = makeTextSprite(label, '#C8102E', 0.4);
+                    sp.position.set(bx - (numCols * stX) / 2 - 1.5, fi * (UH + UGAP) + UH / 2, bz);
+                    scene.add(sp);
+                });
+            });
+
+            sceneLabels.forEach(lbl => {
+                const gl = makeGroundLabel(lbl.text, lbl.color || '#1A6B9A', lbl.scale || 1.0);
+                gl.position.set(lbl.x, 0.02, lbl.z);
+                gl.rotation.z = -(lbl.rotation * Math.PI) / 180;
+                scene.add(gl);
+            });
+        }
+
+        buildBuildings();
+        addLabels();
+
+        let camTheta = camStateRef.current.theta;
+        let camPhi = camStateRef.current.phi;
+        let camR = camStateRef.current.r;
+        const camTarget = new THREE.Vector3(camStateRef.current.tx, camStateRef.current.ty, camStateRef.current.tz);
+        let isDragging = false, isRightDrag = false;
+        let lastMX = 0, lastMY = 0, downMX = 0, downMY = 0, wasDrag = false;
+
+        const VIEWS: Record<string, { th: number, ph: number, r: number }> = {
+            'n': { th: Math.PI * 0.25, ph: 0.75, r: 26 },
+            's': { th: -Math.PI * 0.75, ph: 0.75, r: 26 },
+            'e': { th: Math.PI * 0.75, ph: 0.75, r: 26 },
+            'w': { th: -Math.PI * 0.25, ph: 0.75, r: 26 },
+            'reset': { th: -Math.PI * 0.75, ph: 0.75, r: 26 },
+        };
+
+        function updateCamera() {
+            const x = camR * Math.sin(camPhi) * Math.sin(camTheta) + camTarget.x;
+            const y = camR * Math.cos(camPhi) + camTarget.y;
+            const z = camR * Math.sin(camPhi) * Math.cos(camTheta) + camTarget.z;
+            camera.position.set(x, y, z);
+            camera.lookAt(camTarget);
+            camStateRef.current = { theta: camTheta, phi: camPhi, r: camR, tx: camTarget.x, ty: camTarget.y, tz: camTarget.z };
+        }
+        updateCamera();
+
+        const doZoom = (f: number) => { camR *= f; camR = Math.max(5, Math.min(70, camR)); updateCamera(); };
+        const setView = (name: string) => {
+            const v = VIEWS[name] || VIEWS['reset'];
+            camTheta = v.th; camPhi = v.ph; camR = v.r;
+            updateCamera();
+        };
+
+        threeRef.current = {
+            setUnitHighlight: (id: string, on: boolean) => {
+                const g = unitGroups[id]; if (!g) return;
+                const u = data[id]; if (!u) return;
+                const base = SC_HEX[u.status];
+                g.children.forEach(c => {
+                    if (c.type === 'Mesh') {
+                        const mesh = c as THREE.Mesh;
+                        const mats = mesh.material as THREE.MeshLambertMaterial[];
+                        if (!Array.isArray(mats)) return;
+                        const brs = [0.78, 0.70, 1.30, 0.45, 0.88, 0.95];
+                        mats.forEach((m, i) => {
+                            const b = brs[i] * (on ? 1.22 : 1.0);
+                            m.color.copy(faceColor(base, b));
+                            m.emissive.set(on ? 0.08 : 0, on ? 0.08 : 0, on ? 0.08 : 0);
+                        });
+                    }
+                    if (c.userData.isEdge) {
+                        const line = c as THREE.LineSegments;
+                        const mat = line.material as THREE.LineBasicMaterial;
+                        mat.color.set(on ? 0xC8102E : 0xffffff);
+                        mat.opacity = on ? 0.8 : 0.25;
+                    }
+                });
+            },
+            refreshUnitLabel: (id: string) => {
+                const g = unitGroups[id]; if (!g) return;
+                const u = data[id]; if (!u) return;
+                const newLabel = makeLabel(id, u);
+                let oldLabel: THREE.Object3D | null = null;
+                g.children.forEach(c => { if (c.userData.isLabel) oldLabel = c; });
+                if (oldLabel) g.remove(oldLabel);
+                g.add(newLabel);
+                threeRef.current?.setUnitHighlight(id, false);
+            },
+            doZoom,
+            setView
+        };
+
+        const canvas = renderer.domElement;
+        const raycaster = new THREE.Raycaster();
+        const mouse2d = new THREE.Vector2();
+
+        function getHitUnit(ex: number, ey: number) {
+            if (!mountRef.current) return null;
+            const rect = mountRef.current.getBoundingClientRect();
+            mouse2d.x = ((ex - rect.left) / W) * 2 - 1;
+            mouse2d.y = -((ey - rect.top) / H) * 2 + 1;
+            raycaster.setFromCamera(mouse2d, camera);
+            const meshes: THREE.Object3D[] = [];
+            Object.values(unitGroups).forEach(g => {
+                g.children.forEach(c => { if (c.type === 'Mesh') meshes.push(c); });
+            });
+            const hits = raycaster.intersectObjects(meshes);
+            return hits.length > 0 ? hits[0].object.userData.unitID : null;
+        }
+
+        const onMouseDown = (e: MouseEvent) => {
+            e.preventDefault();
+            isDragging = true; isRightDrag = (e.button === 2 || e.button === 1);
+            lastMX = e.clientX; lastMY = e.clientY; downMX = e.clientX; downMY = e.clientY; wasDrag = false;
+            canvas.style.cursor = 'grabbing';
+        };
+
+        const onMouseMoveDoc = (e: MouseEvent) => {
+            if (!isDragging) return;
+            const dx = e.clientX - lastMX; const dy = e.clientY - lastMY;
+            if (Math.abs(e.clientX - downMX) + Math.abs(e.clientY - downMY) > 4) wasDrag = true;
+            if (!isRightDrag) {
+                camTheta -= dx * 0.007; camPhi += dy * 0.007;
+                camPhi = Math.max(0.08, Math.min(Math.PI * 0.47, camPhi));
+                setCamTheta(camTheta);
+            } else {
+                const right = new THREE.Vector3();
+                right.crossVectors(camera.getWorldDirection(new THREE.Vector3()), camera.up).normalize();
+                camTarget.addScaledVector(right, -dx * 0.02);
+                camTarget.y += dy * 0.02;
+            }
+            lastMX = e.clientX; lastMY = e.clientY;
+            updateCamera();
+        };
+
+        const onMouseUpDoc = () => {
+            isDragging = false; canvas.style.cursor = 'grab';
+            setTimeout(() => { wasDrag = false; }, 40);
+        };
+
+        const onMouseMove = (e: MouseEvent) => {
+            if (wasDrag || isDragging) {
+                setHoverId(null);
+                return;
+            }
+            const id = getHitUnit(e.clientX, e.clientY);
+            setHoverId(id);
+            if (id) {
+                setTooltipPos({ x: e.clientX, y: e.clientY });
+            }
+        };
+
+        const onClick = (e: MouseEvent) => {
+            if (wasDrag) return;
+            const id = getHitUnit(e.clientX, e.clientY);
+            if (id) setSelectedId(id);
+        };
+
+        let tPrev: number | null = null;
+        const onTouchStart = (e: TouchEvent) => {
+            e.preventDefault();
+            if (e.touches.length === 1) { isDragging = true; lastMX = e.touches[0].clientX; lastMY = e.touches[0].clientY; downMX = lastMX; downMY = lastMY; wasDrag = false; }
+            if (e.touches.length === 2) { isDragging = false; tPrev = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY); }
+        };
+        const onTouchMove = (e: TouchEvent) => {
+            e.preventDefault();
+            if (e.touches.length === 1 && isDragging) {
+                const dx = e.touches[0].clientX - lastMX; const dy = e.touches[0].clientY - lastMY;
+                if (Math.abs(e.touches[0].clientX - downMX) + Math.abs(e.touches[0].clientY - downMY) > 6) wasDrag = true;
+                camTheta -= dx * 0.009; camPhi += dy * 0.009; camPhi = Math.max(0.08, Math.min(Math.PI * 0.47, camPhi));
+                lastMX = e.touches[0].clientX; lastMY = e.touches[0].clientY; updateCamera();
+            }
+            if (e.touches.length === 2 && tPrev !== null) {
+                const d = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+                camR *= tPrev / d; camR = Math.max(5, Math.min(70, camR)); tPrev = d; updateCamera();
+            }
+        };
+        const onTouchEnd = (e: TouchEvent) => {
+            isDragging = false; tPrev = null;
+            if (!wasDrag && e.changedTouches.length > 0) {
+                const t = e.changedTouches[0];
+                const id = getHitUnit(t.clientX, t.clientY);
+                if (id) setSelectedId(id);
+            }
+            setTimeout(() => { wasDrag = false; }, 50);
+        };
+
+        canvas.addEventListener('mousedown', onMouseDown);
+        document.addEventListener('mousemove', onMouseMoveDoc);
+        document.addEventListener('mouseup', onMouseUpDoc);
+        canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+        canvas.addEventListener('wheel', (e) => { e.preventDefault(); camR *= e.deltaY > 0 ? 1.1 : 0.91; camR = Math.max(5, Math.min(70, camR)); updateCamera(); }, { passive: false });
+        canvas.addEventListener('mousemove', onMouseMove);
+        canvas.addEventListener('click', onClick);
+        canvas.addEventListener('mouseleave', () => setHoverId(null));
+        canvas.addEventListener('touchstart', onTouchStart, { passive: false });
+        canvas.addEventListener('touchmove', onTouchMove, { passive: false });
+        canvas.addEventListener('touchend', onTouchEnd);
+
+        const LOCAL_FACE_OFFSETS = [
+            new THREE.Vector3(0, 0, UD / 2 + 0.15),
+            new THREE.Vector3(0, 0, -(UD / 2 + 0.15)),
+            new THREE.Vector3(UW / 2 + 0.15, 0, 0),
+            new THREE.Vector3(-(UW / 2 + 0.15), 0, 0),
+        ];
+        const _camDir = new THREE.Vector3();
+
+        let reqId: number;
+        const animate = () => {
+            reqId = requestAnimationFrame(animate);
+
+            _camDir.subVectors(camera.position, camTarget);
+            _camDir.y = 0;
+            const hLen = _camDir.length();
+            if (hLen > 0.001) {
+                _camDir.divideScalar(hLen);
+                const wx = _camDir.x, wz = _camDir.z;
+
+                Object.values(unitGroups).forEach(g => {
+                    const angle = (g.userData.blockAngle ?? 0) as number;
+                    const ca = Math.cos(angle), sa = Math.sin(angle);
+                    const lx = wx * ca + wz * sa;
+                    const lz = -wx * sa + wz * ca;
+
+                    const dots = [lz, -lz, lx, -lx];
+                    let bestIdx = 0, bestDot = -Infinity;
+                    dots.forEach((d, i) => { if (d > bestDot) { bestDot = d; bestIdx = i; } });
+
+                    const prevIdx = (g.userData.labelFaceIdx ?? bestIdx) as number;
+                    if (bestIdx !== prevIdx && bestDot < dots[prevIdx] + 0.15) {
+                        bestIdx = prevIdx;
+                        bestDot = dots[prevIdx];
+                    }
+                    g.userData.labelFaceIdx = bestIdx;
+
+                    g.children.forEach(c => {
+                        if (c.userData.isLabel) {
+                            c.position.copy(LOCAL_FACE_OFFSETS[bestIdx]);
+                            c.visible = bestDot > 0.25;
+                        }
+                    });
+                });
+            }
+
+            renderer.render(scene, camera);
+        };
+        animate();
+
+        // Tam ekrana giriş/çıkışta da tetiklensin diye ResizeObserver kullanılıyor
+        const onResize = () => {
+            if (!mountRef.current) return;
+            W = mountRef.current.clientWidth; H = mountRef.current.clientHeight;
+            camera.aspect = W / H; camera.updateProjectionMatrix();
+            renderer.setSize(W, H);
+        };
+        window.addEventListener('resize', onResize);
+        const ro = new ResizeObserver(onResize);
+        ro.observe(mountRef.current);
+
+        return () => {
+            cancelAnimationFrame(reqId);
+            ro.disconnect();
+            window.removeEventListener('resize', onResize);
+            document.removeEventListener('mousemove', onMouseMoveDoc);
+            document.removeEventListener('mouseup', onMouseUpDoc);
+            if (mountRef.current) mountRef.current.removeChild(renderer.domElement);
+        };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [data, blockConfigs]);
+
+    // ============================================================
+    // Select & Hover sync
+    // ============================================================
+    const prevHover = useRef<string | null>(null);
+    const prevSelect = useRef<string | null>(null);
+
+    useEffect(() => {
+        if (!threeRef.current) return;
+        if (prevHover.current && prevHover.current !== selectedId) {
+            threeRef.current.setUnitHighlight(prevHover.current, false);
+        }
+        if (hoverId && hoverId !== selectedId) {
+            threeRef.current.setUnitHighlight(hoverId, true);
+        }
+        prevHover.current = hoverId;
+    }, [hoverId, selectedId]);
+
+    useEffect(() => {
+        if (!threeRef.current) return;
+        if (prevSelect.current) {
+            threeRef.current.setUnitHighlight(prevSelect.current, false);
+        }
+        if (selectedId) {
+            threeRef.current.setUnitHighlight(selectedId, true);
+        }
+        prevSelect.current = selectedId;
+    }, [selectedId]);
+
+    // ============================================================
+    // Derived State
+    // ============================================================
+    const allUnits = Object.values(data);
+    const stats = {
+        total: allUnits.length,
+        available: allUnits.filter(u => u.status === 'available').length,
+        sold: allUnits.filter(u => u.status === 'sold').length,
+        reserved: allUnits.filter(u => u.status === 'reserved').length,
+        closed: allUnits.filter(u => u.status === 'not_for_sale').length,
+    };
+
+    const filteredUnits = useMemo(() => {
+        return allUnits
+            .filter(u => listFilter === 'all' || u.status === listFilter)
+            .sort((a, b) => a.id.localeCompare(b.id));
+    }, [allUnits, listFilter]);
+
+    const selected = selectedId ? data[selectedId] : null;
+
+    if (isFetching) {
+        return (
+            <div className="flex flex-col items-center justify-center h-full bg-[#eceef2] gap-3">
+                <Loader2 size={32} className="animate-spin text-[#C8102E]" />
+                <div className="text-sm text-slate-500">Sunum ekranı hazırlanıyor...</div>
+            </div>
+        );
+    }
+
+    if (!activeProject) {
+        return (
+            <div className="flex flex-col items-center justify-center h-full bg-[#eceef2]">
+                <Shield className="text-[#C8102E] mb-4" size={48} />
+                <div className="font-[Bebas_Neue] text-2xl tracking-[3px] text-[#1a1a2e]">Aktif proje seçilmedi</div>
+                <div className="text-[#8892A0] text-sm mt-2 max-w-sm text-center">Satış Sunum Ekranını kullanabilmek için lütfen üst menüden projenizi seçin.</div>
+            </div>
+        );
+    }
+
+    if (Object.keys(data).length === 0) {
+        return (
+            <div className="flex flex-col items-center justify-center h-full bg-[#eceef2]">
+                <Shield className="text-[#C8102E] mb-4" size={48} />
+                <div className="font-[Bebas_Neue] text-2xl tracking-[3px] text-[#1a1a2e]">Gösterilecek daire bulunamadı</div>
+                <div className="text-[#8892A0] text-sm mt-2 max-w-sm text-center">Bu projede henüz blok/daire tanımı yapılmamış.</div>
+            </div>
+        );
+    }
+
+    return (
+        <div ref={wrapRef} className="flex flex-col h-full bg-[#eceef2] font-sans text-[#1a1a2e]">
+
+            {/* HEADER: proje adı + sunum kontrolleri */}
+            <div className="flex items-center gap-3 px-4 py-2 bg-white border-b border-[#DDE1E7] shrink-0">
+                <div className="font-[Bebas_Neue] text-lg md:text-xl tracking-[3px] text-[#C8102E] whitespace-nowrap">
+                    {activeProject.name}
+                </div>
+                <div className="hidden md:flex items-center gap-4 md:gap-6 overflow-x-auto hide-scrollbar flex-nowrap whitespace-nowrap flex-1 justify-center">
+                    {Object.entries(SC_CSS).map(([k, color]) => (
+                        <div key={k} className="flex items-center gap-1.5 text-[9px] tracking-[1.5px] uppercase text-[#8892A0]">
+                            <div className="w-2.5 h-2.5 rounded-[2px]" style={{ backgroundColor: color }}></div>
+                            {SL[k as Status]}
+                        </div>
+                    ))}
+                </div>
+                <div className="flex items-center gap-1.5 ml-auto md:ml-0">
+                    <button
+                        onClick={togglePrices}
+                        title={showPrices ? 'Fiyatları gizle' : 'Fiyatları göster'}
+                        className={`flex items-center gap-1 px-2 md:px-3 py-1 md:py-1.5 text-[8px] md:text-[9px] tracking-[1.5px] uppercase rounded-[3px] border shadow-sm transition-colors ${showPrices ? 'bg-[#C8102E] border-[#C8102E] text-white' : 'bg-white/90 border-[#DDE1E7] text-[#8892A0] hover:text-[#C8102E] hover:border-[#C8102E]'}`}
+                    >
+                        <Tag size={11} /> {showPrices ? 'Fiyatlar Açık' : 'Fiyatlar Kapalı'}
+                    </button>
+                    <button
+                        onClick={toggleFullscreen}
+                        title={isFullscreen ? 'Sunumdan çık' : 'Tam ekran sunum'}
+                        className="flex items-center gap-1 px-2 md:px-3 py-1 md:py-1.5 text-[8px] md:text-[9px] tracking-[1.5px] uppercase rounded-[3px] border border-[#DDE1E7] bg-white/90 text-[#8892A0] hover:text-[#C8102E] hover:border-[#C8102E] shadow-sm transition-colors"
+                    >
+                        {isFullscreen ? <Minimize2 size={11} /> : <Maximize2 size={11} />}
+                        <span className="hidden md:inline">{isFullscreen ? 'Sunumdan Çık' : 'Sunum Modu'}</span>
+                    </button>
+                </div>
+            </div>
+
+            {/* BODY */}
+            <div className="flex flex-1 overflow-hidden relative w-full">
+                {/* VIEWPORT */}
+                <div className="flex-1 relative overflow-hidden bg-gradient-to-br from-[#F5F6F8] to-[#E8EAEE] w-full touch-none" ref={mountRef}>
+
+                    {/* Zoom Controls */}
+                    <div className="absolute top-3 left-3 flex flex-col gap-1 z-10">
+                        <button className="w-[28px] md:w-[32px] h-[28px] md:h-[32px] bg-white/90 border border-[#DDE1E7] text-[#8892A0] text-lg rounded-[3px] flex items-center justify-center hover:bg-[#C8102E] hover:border-[#C8102E] hover:text-white transition-colors shadow-sm" onClick={() => threeRef.current?.doZoom(0.88)}>+</button>
+                        <button className="w-[28px] md:w-[32px] h-[28px] md:h-[32px] bg-white/90 border border-[#DDE1E7] text-[#8892A0] text-lg rounded-[3px] flex items-center justify-center hover:bg-[#C8102E] hover:border-[#C8102E] hover:text-white transition-colors shadow-sm" onClick={() => threeRef.current?.doZoom(1.14)}>-</button>
+                    </div>
+
+                    {/* Compass */}
+                    {(() => {
+                        const bearing = ((-camTheta - Math.PI / 2) * 180 / Math.PI + 360) % 360;
+                        const dirs = ['K', 'KD', 'D', 'GD', 'G', 'GB', 'B', 'KB'];
+                        const idx = Math.round(bearing / 45) % 8;
+                        return (
+                            <div className="absolute bottom-14 right-3 z-10 select-none">
+                                <div className="relative w-16 h-16">
+                                    <svg viewBox="0 0 100 100" className="w-full h-full drop-shadow-lg" style={{ transform: `rotate(${bearing}deg)`, transition: 'transform 0.1s ease' }}>
+                                        <circle cx="50" cy="50" r="46" fill="white" fillOpacity="0.88" stroke="#DDE1E7" strokeWidth="2" />
+                                        <polygon points="50,8 44,50 56,50" fill="#C8102E" />
+                                        <polygon points="50,92 44,50 56,50" fill="#666" />
+                                        <circle cx="50" cy="50" r="5" fill="#333" />
+                                        <text x="50" y="6" textAnchor="middle" fontSize="10" fontWeight="bold" fill="#C8102E">K</text>
+                                    </svg>
+                                </div>
+                                <div className="text-center text-[8px] font-bold text-slate-500 mt-0.5">{dirs[idx]}</div>
+                            </div>
+                        );
+                    })()}
+
+                    {/* View Buttons */}
+                    <div className="absolute top-3 right-3 flex flex-col md:flex-row flex-wrap gap-1.5 justify-end z-10 max-w-[150px] md:max-w-[400px]">
+                        {[
+                            { id: 'n', label: "Kuzey'den" },
+                            { id: 's', label: "Güney'den" },
+                            { id: 'e', label: "Doğu'dan" },
+                            { id: 'w', label: "Batı'dan" },
+                            { id: 'reset', label: "Sıfırla" },
+                        ].map(v => (
+                            <button
+                                key={v.id}
+                                className="bg-white/90 border border-[#DDE1E7] text-[#8892A0] px-2 md:px-3 py-1 md:py-1.5 text-[8px] md:text-[9px] tracking-[1.5px] uppercase rounded-[3px] hover:text-[#C8102E] hover:border-[#C8102E] transition-colors shadow-sm"
+                                onClick={() => threeRef.current?.setView(v.id)}
+                            >
+                                {v.label}
+                            </button>
+                        ))}
+                    </div>
+
+                    {/* Seçili daire detay kartı (müşteriye dönük) */}
+                    {selected && (
+                        <div className="absolute left-3 bottom-14 z-20 w-[270px] md:w-[300px] bg-white/95 backdrop-blur border border-[#DDE1E7] border-l-[4px] rounded-lg shadow-[0_12px_36px_rgba(0,0,0,0.16)] animate-in fade-in slide-in-from-bottom-2"
+                            style={{ borderLeftColor: SC_CSS[selected.status] }}>
+                            <div className="flex items-start justify-between px-4 pt-3">
+                                <div>
+                                    <div className="font-[Bebas_Neue] text-2xl tracking-[3px] text-[#1a1a2e] leading-none">Daire {selected.id}</div>
+                                    <div className="text-[9px] tracking-[2px] uppercase text-[#8892A0] mt-1">
+                                        Blok {selected.block} · {floorLabel(selected)}
+                                    </div>
+                                </div>
+                                <button className="text-[#8892A0] hover:text-[#C8102E] p-1 -mr-1" onClick={() => setSelectedId(null)}><X size={16} /></button>
+                            </div>
+                            <div className="px-4 py-2.5">
+                                <span className="inline-flex items-center gap-1.5 text-[9px] font-bold tracking-[1.5px] uppercase px-2 py-1 rounded-full"
+                                    style={{ backgroundColor: SC_CSS[selected.status] + '18', color: SC_CSS[selected.status] }}>
+                                    <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: SC_CSS[selected.status] }}></span>
+                                    {SL[selected.status]}
+                                </span>
+                                {(selected.unit_type || selected.gross_area || selected.net_area) && (
+                                    <div className="grid grid-cols-3 gap-2 mt-3">
+                                        {selected.unit_type && (
+                                            <div>
+                                                <div className="text-[8px] tracking-[1.5px] uppercase text-[#8892A0]">Tip</div>
+                                                <div className="text-[12px] font-semibold text-[#1a1a2e]">{selected.unit_type}</div>
+                                            </div>
+                                        )}
+                                        {selected.gross_area != null && selected.gross_area > 0 && (
+                                            <div>
+                                                <div className="text-[8px] tracking-[1.5px] uppercase text-[#8892A0]">Brüt</div>
+                                                <div className="text-[12px] font-semibold text-[#1a1a2e]">{selected.gross_area} m²</div>
+                                            </div>
+                                        )}
+                                        {selected.net_area != null && selected.net_area > 0 && (
+                                            <div>
+                                                <div className="text-[8px] tracking-[1.5px] uppercase text-[#8892A0]">Net</div>
+                                                <div className="text-[12px] font-semibold text-[#1a1a2e]">{selected.net_area} m²</div>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                            {showPrices && priceVisibleFor(selected.status) && selected.list_price != null && (
+                                <div className="px-4 py-3 border-t border-[#DDE1E7] bg-[#fdfaf3] rounded-b-lg">
+                                    <div className="text-[8px] tracking-[2px] uppercase text-[#8892A0]">Liste Fiyatı</div>
+                                    <div className="font-[Bebas_Neue] text-3xl tracking-[1px] text-[#C8102E] leading-tight">{fmtTL(selected.list_price)}</div>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {/* Stats Bar */}
+                    <div className="absolute bottom-0 left-0 right-0 flex bg-white/95 border-t border-[#DDE1E7] z-10 w-full overflow-x-auto hide-scrollbar">
+                        {[
+                            { id: 'total', color: '#C8102E', label: 'Toplam', val: stats.total },
+                            { id: 'available', color: '#27AE60', label: 'Açık', val: stats.available },
+                            { id: 'sold', color: '#C8102E', label: 'Satıldı', val: stats.sold },
+                            { id: 'reserved', color: '#E67E22', label: 'Rezerve', val: stats.reserved },
+                            { id: 'not_for_sale', color: '#95A5A6', label: 'Kapalı', val: stats.closed },
+                        ].map((st, i) => (
+                            <div key={st.id} className={`flex-1 min-w-[60px] p-1.5 md:p-2.5 text-center ${i !== 4 ? 'border-r border-[#DDE1E7]' : ''}`}>
+                                <div className="font-[Bebas_Neue] text-xl md:text-2xl leading-none" style={{ color: st.color }}>{st.val}</div>
+                                <div className="text-[7px] md:text-[8px] tracking-[1.5px] uppercase text-[#8892A0] mt-[1px] md:mt-[2px] truncate px-1">{st.label}</div>
+                            </div>
+                        ))}
+                    </div>
+
+                    <div className="absolute bottom-12 md:bottom-16 left-1/2 -translate-x-1/2 text-[7px] md:text-[8px] tracking-[1.5px] uppercase text-[#8892A0] bg-white/90 px-3 py-1 md:px-4 md:py-1.5 border border-[#DDE1E7] rounded-full whitespace-nowrap pointer-events-none z-10 shadow-sm opacity-80 backdrop-blur-sm">
+                        Tıkla: <span className="text-[#C8102E] font-bold">Detay</span> | Sürükle: Döndür
+                    </div>
+
+                </div>
+
+                {/* SIDEBAR LIST */}
+                <div className={`${isMobileSidebarOpen ? 'translate-x-0' : 'translate-x-full'} md:translate-x-0 fixed md:relative z-40 top-[52px] md:top-0 right-0 bottom-0 md:h-auto w-[280px] md:w-[280px] bg-white border-l border-[#DDE1E7] flex flex-col shrink-0 transition-transform duration-300 shadow-2xl md:shadow-none`}>
+                    <div className="p-[14px] md:p-[18px] border-b border-[#DDE1E7] relative">
+                        <div className="flex items-center gap-2">
+                            <div className="font-[Bebas_Neue] text-base md:text-lg tracking-[3px] md:tracking-[4px] text-[#C8102E]">Daireler</div>
+                            <div className="bg-[#fdeef1] text-[#C8102E] text-[9px] md:text-[10px] font-bold px-2 py-0.5 rounded-full">{stats.total}</div>
+                            {isMobileSidebarOpen && (
+                                <button
+                                    className="md:hidden absolute right-3 top-3 text-[#8892A0] p-1 bg-slate-100 rounded hover:bg-slate-200"
+                                    onClick={() => setIsMobileSidebarOpen(false)}
+                                >
+                                    <X size={16} />
+                                </button>
+                            )}
+                        </div>
+                    </div>
+                    <div className="p-2.5 md:p-3.5 border-b border-[#DDE1E7] flex gap-1.5 flex-wrap">
+                        {['all', 'available', 'sold', 'reserved', 'not_for_sale'].map(f => (
+                            <button
+                                key={f}
+                                className={`px-2 py-1 text-[8px] tracking-[1px] uppercase border rounded-full transition-colors ${listFilter === f ? 'border-[#C8102E] text-[#C8102E] bg-[#fdeef1]' : 'border-[#DDE1E7] text-[#8892A0] bg-transparent hover:border-[#C8102E] hover:text-[#C8102E] hover:bg-[#fdeef1]'}`}
+                                onClick={() => setListFilter(f as Status | 'all')}
+                            >
+                                {f === 'all' ? 'Tümü' : SL[f as Status]}
+                            </button>
+                        ))}
+                    </div>
+                    <div className="flex-1 overflow-y-auto w-full custom-scrollbar py-1">
+                        {filteredUnits.map(u => (
+                            <div
+                                key={u.id}
+                                id={`li-${u.id}`}
+                                className={`p-3 border-b border-black/5 flex items-center gap-2.5 cursor-pointer transition-colors hover:bg-slate-50 ${selectedId === u.id ? 'bg-[#fdeef1] border-l-[3px] border-l-[#C8102E]' : ''}`}
+                                onClick={() => setSelectedId(u.id)}
+                            >
+                                <div className="w-2 h-2 rounded-sm shrink-0" style={{ backgroundColor: SC_CSS[u.status] }}></div>
+                                <div className="text-[10px] font-bold tracking-[1px] min-w-[55px]">{u.id}</div>
+                                <div className="flex-1 min-w-0 text-right">
+                                    <div className="text-[10.5px] font-semibold text-[#1a1a2e] whitespace-nowrap overflow-hidden text-ellipsis">
+                                        {showPrices && priceVisibleFor(u.status) && u.list_price != null ? fmtTL(u.list_price) : '—'}
+                                    </div>
+                                    <div className="text-[8px] tracking-[1px] uppercase mt-0.5" style={{ color: SC_CSS[u.status] }}>{SL[u.status]}</div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            </div>
+
+            {/* TOOLTIP */}
+            <div
+                className={`fixed pointer-events-none z-[2000] bg-white border border-[#DDE1E7] border-l-[3px] border-l-[#C8102E] px-3 md:px-3.5 py-2 md:py-2.5 rounded shadow-[0_4px_16px_rgba(0,0,0,0.12)] transition-opacity duration-100 min-w-[150px] md:min-w-[180px] ${hoverId ? 'opacity-100' : 'opacity-0'}`}
+                style={{ left: tooltipPos.x + 16, top: tooltipPos.y - 8 }}
+            >
+                {hoverId && data[hoverId] && (
+                    <>
+                        <div className="font-bold tracking-[1.5px] text-[#C8102E] text-[10px] md:text-[12px] mb-1">{hoverId} — {floorLabel(data[hoverId])}</div>
+                        <div className="text-[8px] md:text-[9px] tracking-[1.5px] uppercase" style={{ color: SC_CSS[data[hoverId].status] }}>{SL[data[hoverId].status]}</div>
+                        <div className="text-[#8892A0] text-[8px] md:text-[10px] mt-1.5 leading-[1.6]">
+                            {data[hoverId].unit_type && <>{data[hoverId].unit_type}<br /></>}
+                            {data[hoverId].gross_area != null && data[hoverId].gross_area! > 0 && <>Brüt: <span className="text-[#444]">{data[hoverId].gross_area} m²</span><br /></>}
+                            {showPrices && priceVisibleFor(data[hoverId].status) && data[hoverId].list_price != null && (
+                                <>Fiyat: <span className="text-[#1a1a2e] font-bold">{fmtTL(data[hoverId].list_price)}</span></>
+                            )}
+                        </div>
+                    </>
+                )}
+            </div>
+
+        </div>
+    );
+}

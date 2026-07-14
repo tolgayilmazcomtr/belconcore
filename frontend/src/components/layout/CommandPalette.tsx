@@ -29,6 +29,7 @@ export const COMMANDS: CommandItem[] = [
     { label: 'Müşteriler', href: '/customers', section: 'CRM & SATIŞ', module: 'module.crm', shortcut: ['G', 'M'], keywords: 'müşteri crm' },
     { label: 'Fırsatlar', href: '/crm', section: 'CRM & SATIŞ', module: 'module.crm', shortcut: ['G', 'F'], keywords: 'fırsat lead kanban' },
     { label: 'Teklifler', href: '/offers', section: 'CRM & SATIŞ', module: 'module.crm', shortcut: ['G', 'T'], keywords: 'teklif offer' },
+    { label: 'Satış Sunum Ekranı', href: '/presentation', section: 'CRM & SATIŞ', module: 'module.presentation', keywords: 'sunum müşteri ekranı dijital ikiz fiyat 3d' },
 
     // Accounting
     { label: 'Genel Bakış', href: '/accounting', section: 'ÖN MUHASEBE', module: 'module.accounting', shortcut: ['G', 'G'], keywords: 'muhasebe genel bakış' },

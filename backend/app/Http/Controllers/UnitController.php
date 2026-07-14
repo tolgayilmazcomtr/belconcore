@@ -21,6 +21,30 @@ class UnitController extends Controller
         return response()->json($query->get());
     }
 
+    /**
+     * Müşteri karşısında kullanılan satış sunum ekranı için sanitize edilmiş liste.
+     * Kişisel veri (customer, owner_name, owner_phone, owner_note) SUNUCUDA filtrelenir
+     * ve istemciye hiç gönderilmez.
+     */
+    public function presentation(Request $request)
+    {
+        $units = \App\Models\Unit::where('project_id', $request->active_project_id)
+            ->select([
+                'id',
+                'block_id',
+                'unit_no',
+                'floor_no',
+                'unit_type',
+                'gross_area',
+                'net_area',
+                'status',
+                'list_price',
+            ])
+            ->get();
+
+        return response()->json($units);
+    }
+
     public function store(Request $request)
     {
         $validated = $request->validate([

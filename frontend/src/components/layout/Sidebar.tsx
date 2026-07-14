@@ -9,7 +9,7 @@ import {
   Building, Home, ChevronDown, TrendingUp, TrendingDown,
   Landmark, FileCheck, BarChart2, Calendar, Wallet,
   FileBarChart, Receipt, ShoppingCart, ShoppingBag,
-  Menu, X, ChevronRight, Search, Box, Hammer
+  Menu, X, ChevronRight, Search, Box, Hammer, MonitorPlay
 } from "lucide-react";
 import { CommandPalette, COMMANDS } from "./CommandPalette";
 import { useAuthStore } from "@/store/useAuthStore";
@@ -58,6 +58,7 @@ const NAV: NavEntry[] = [
       { label: "Müşteriler", href: "/customers", icon: <Users size={13} /> },
       { label: "Fırsatlar", href: "/crm", exact: true, icon: <PieChart size={13} /> },
       { label: "Teklifler", href: "/offers", icon: <FileText size={13} /> },
+      { label: "Satış Sunum Ekranı", href: "/presentation", icon: <MonitorPlay size={13} />, module: "module.presentation" },
     ],
   },
   {

@@ -59,6 +59,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::apiResource('blocks', BlockController::class);
         Route::apiResource('scene-labels', SceneLabelController::class)->only(['index', 'store', 'update', 'destroy']);
         Route::post('units/bulk', [UnitController::class, 'storeBulk']);
+        Route::get('presentation/units', [UnitController::class, 'presentation']);
         Route::apiResource('units', UnitController::class);
         
         // CRM & Sales

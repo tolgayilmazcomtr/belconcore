@@ -43,6 +43,7 @@ const MODULE_META: ModuleMeta[] = [
     { key: 'module.dashboard',   label: 'Dashboard',         desc: 'Ana ekran ve özet kartlar' },
     { key: 'module.projects',    label: 'Proje Yönetimi',    desc: 'Projeler, bloklar, üniteler, 3D satış' },
     { key: 'module.crm',         label: 'CRM & Satış',       desc: 'Müşteriler, fırsatlar, teklifler' },
+    { key: 'module.presentation', label: 'Satış Sunum',      desc: 'Müşteriye dönük 3D sunum ekranı (fiyatlı, kişisel veri gizli)' },
     { key: 'module.accounting',  label: 'Ön Muhasebe',       desc: 'Faturalar, sözleşmeler, çek/senet, kasa' },
     { key: 'module.stock',       label: 'Stok & Maliyet',    desc: 'Depo, stok hareketleri, maliyet takip' },
     { key: 'module.site',        label: 'Şantiye İlerleme',  desc: 'İnşaat ilerleme takibi' },

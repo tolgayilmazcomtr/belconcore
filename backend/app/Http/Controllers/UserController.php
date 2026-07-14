@@ -15,6 +15,7 @@ class UserController extends Controller
         'module.dashboard',
         'module.projects',
         'module.crm',
+        'module.presentation',
         'module.accounting',
         'module.stock',
         'module.site',
@@ -24,9 +25,9 @@ class UserController extends Controller
 
     // Default module access per role
     const ROLE_DEFAULTS = [
-        'Admin'           => ['module.dashboard','module.projects','module.crm','module.accounting','module.stock','module.site','module.reports','module.settings'],
-        'Project Manager' => ['module.dashboard','module.projects','module.crm','module.reports'],
-        'Sales'           => ['module.dashboard','module.crm'],
+        'Admin'           => ['module.dashboard','module.projects','module.crm','module.presentation','module.accounting','module.stock','module.site','module.reports','module.settings'],
+        'Project Manager' => ['module.dashboard','module.projects','module.crm','module.presentation','module.reports'],
+        'Sales'           => ['module.dashboard','module.crm','module.presentation'],
         'Accounting'      => ['module.dashboard','module.accounting','module.reports'],
         'Site Supervisor' => ['module.dashboard','module.projects','module.site','module.stock'],
     ];
