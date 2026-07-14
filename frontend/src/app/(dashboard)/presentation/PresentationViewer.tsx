@@ -2,10 +2,11 @@
 
 import React, { useEffect, useRef, useState, useMemo, useCallback } from "react";
 import * as THREE from "three";
-import { X, Shield, Loader2, Maximize2, Minimize2, Tag } from "lucide-react";
+import { X, Shield, Loader2, Maximize2, Minimize2, Tag, FileText } from "lucide-react";
 import { useProjectStore } from "@/store/useProjectStore";
 import api from "@/lib/api";
 import { Block } from "@/types/project.types";
+import QuickOfferModal from "./QuickOfferModal";
 
 // ============================================================
 // Satış Sunum Ekranı (Müşteriye Dönük Dijital İkiz)
@@ -30,6 +31,7 @@ interface PresUnit {
 
 interface UnitData {
     id: string;              // sahne kimliği: blokKodu+katTag+cephe
+    system_id: number | null; // veritabanı unit id (teklif oluşturmak için)
     block: string;
     fi: number;              // kat index
     fl: string;              // kat tag ("Z", "1", "roof"...)
@@ -91,6 +93,7 @@ export default function PresentationViewer() {
     const [isFetching, setIsFetching] = useState(true);
     const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
     const [isFullscreen, setIsFullscreen] = useState(false);
+    const [showOffer, setShowOffer] = useState(false);
 
     // Fiyat etiketleri (sunum sırasında istenirse kapatılabilir)
     const [showPrices, setShowPrices] = useState(true);
@@ -192,6 +195,7 @@ export default function PresentationViewer() {
                             const su = blockUnits.find(u => u.unit_no === unitId);
                             newData[unitId] = {
                                 id: unitId,
+                                system_id: su ? su.id : null,
                                 block: blockCode,
                                 fi,
                                 fl: flTag,
@@ -907,9 +911,19 @@ export default function PresentationViewer() {
                                 )}
                             </div>
                             {showPrices && priceVisibleFor(selected.status) && selected.list_price != null && (
-                                <div className="px-4 py-3 border-t border-[#DDE1E7] bg-[#fdfaf3] rounded-b-lg">
+                                <div className="px-4 py-3 border-t border-[#DDE1E7] bg-[#fdfaf3]">
                                     <div className="text-[8px] tracking-[2px] uppercase text-[#8892A0]">Liste Fiyatı</div>
                                     <div className="font-[Bebas_Neue] text-3xl tracking-[1px] text-[#C8102E] leading-tight">{fmtTL(selected.list_price)}</div>
+                                </div>
+                            )}
+                            {priceVisibleFor(selected.status) && selected.system_id != null && (
+                                <div className="px-4 py-3 border-t border-[#DDE1E7] rounded-b-lg">
+                                    <button
+                                        className="w-full bg-[#C8102E] hover:bg-[#E8294A] text-white py-2.5 text-[10px] md:text-[11px] font-bold tracking-[2px] uppercase rounded-[3px] transition-colors flex items-center justify-center gap-2"
+                                        onClick={() => setShowOffer(true)}
+                                    >
+                                        <FileText size={13} /> Teklif Hazırla
+                                    </button>
                                 </div>
                             )}
                         </div>
@@ -1005,6 +1019,22 @@ export default function PresentationViewer() {
                     </>
                 )}
             </div>
+
+            {/* HIZLI TEKLİF MODALI */}
+            {selected && selected.system_id != null && (
+                <QuickOfferModal
+                    open={showOffer}
+                    onClose={() => setShowOffer(false)}
+                    unit={{
+                        system_id: selected.system_id,
+                        unit_no: selected.id,
+                        block: selected.block,
+                        floorLabel: floorLabel(selected),
+                        list_price: selected.list_price,
+                    }}
+                    projectId={activeProject.id}
+                />
+            )}
 
         </div>
     );
