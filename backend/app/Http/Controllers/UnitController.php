@@ -24,7 +24,8 @@ class UnitController extends Controller
     /**
      * Müşteri karşısında kullanılan satış sunum ekranı için sanitize edilmiş liste.
      * Kişisel veri (customer, owner_name, owner_phone, owner_note) SUNUCUDA filtrelenir
-     * ve istemciye hiç gönderilmez.
+     * ve istemciye hiç gönderilmez. Satılan daireler de müşteri ayırt edemesin diye
+     * "not_for_sale" olarak maskelenir.
      */
     public function presentation(Request $request)
     {
@@ -40,7 +41,14 @@ class UnitController extends Controller
                 'status',
                 'list_price',
             ])
-            ->get();
+            ->get()
+            ->map(function ($u) {
+                if ($u->status === 'sold') {
+                    $u->status = 'not_for_sale';
+                    $u->list_price = null;
+                }
+                return $u;
+            });
 
         return response()->json($units);
     }

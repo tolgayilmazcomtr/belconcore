@@ -737,13 +737,7 @@ export default function PresentationViewer() {
     // Derived State
     // ============================================================
     const allUnits = Object.values(data);
-    const stats = {
-        total: allUnits.length,
-        available: allUnits.filter(u => u.status === 'available').length,
-        sold: allUnits.filter(u => u.status === 'sold').length,
-        reserved: allUnits.filter(u => u.status === 'reserved').length,
-        closed: allUnits.filter(u => u.status === 'not_for_sale').length,
-    };
+    const stats = { total: allUnits.length };
 
     const filteredUnits = useMemo(() => {
         return allUnits
@@ -791,7 +785,7 @@ export default function PresentationViewer() {
                     {activeProject.name}
                 </div>
                 <div className="hidden md:flex items-center gap-4 md:gap-6 overflow-x-auto hide-scrollbar flex-nowrap whitespace-nowrap flex-1 justify-center">
-                    {Object.entries(SC_CSS).map(([k, color]) => (
+                    {Object.entries(SC_CSS).filter(([k]) => k !== 'sold').map(([k, color]) => (
                         <div key={k} className="flex items-center gap-1.5 text-[9px] tracking-[1.5px] uppercase text-[#8892A0]">
                             <div className="w-2.5 h-2.5 rounded-[2px]" style={{ backgroundColor: color }}></div>
                             {SL[k as Status]}
@@ -834,7 +828,7 @@ export default function PresentationViewer() {
                         const dirs = ['K', 'KD', 'D', 'GD', 'G', 'GB', 'B', 'KB'];
                         const idx = Math.round(bearing / 45) % 8;
                         return (
-                            <div className="absolute bottom-14 right-3 z-10 select-none">
+                            <div className="absolute bottom-3 right-3 z-10 select-none">
                                 <div className="relative w-16 h-16">
                                     <svg viewBox="0 0 100 100" className="w-full h-full drop-shadow-lg" style={{ transform: `rotate(${bearing}deg)`, transition: 'transform 0.1s ease' }}>
                                         <circle cx="50" cy="50" r="46" fill="white" fillOpacity="0.88" stroke="#DDE1E7" strokeWidth="2" />
@@ -870,7 +864,7 @@ export default function PresentationViewer() {
 
                     {/* Seçili daire detay kartı (müşteriye dönük) */}
                     {selected && (
-                        <div className="absolute left-3 bottom-14 z-20 w-[270px] md:w-[300px] bg-white/95 backdrop-blur border border-[#DDE1E7] border-l-[4px] rounded-lg shadow-[0_12px_36px_rgba(0,0,0,0.16)] animate-in fade-in slide-in-from-bottom-2"
+                        <div className="absolute left-3 bottom-3 z-20 w-[270px] md:w-[300px] bg-white/95 backdrop-blur border border-[#DDE1E7] border-l-[4px] rounded-lg shadow-[0_12px_36px_rgba(0,0,0,0.16)] animate-in fade-in slide-in-from-bottom-2"
                             style={{ borderLeftColor: SC_CSS[selected.status] }}>
                             <div className="flex items-start justify-between px-4 pt-3">
                                 <div>
@@ -929,23 +923,7 @@ export default function PresentationViewer() {
                         </div>
                     )}
 
-                    {/* Stats Bar */}
-                    <div className="absolute bottom-0 left-0 right-0 flex bg-white/95 border-t border-[#DDE1E7] z-10 w-full overflow-x-auto hide-scrollbar">
-                        {[
-                            { id: 'total', color: '#C8102E', label: 'Toplam', val: stats.total },
-                            { id: 'available', color: '#27AE60', label: 'Açık', val: stats.available },
-                            { id: 'sold', color: '#C8102E', label: 'Satıldı', val: stats.sold },
-                            { id: 'reserved', color: '#E67E22', label: 'Rezerve', val: stats.reserved },
-                            { id: 'not_for_sale', color: '#95A5A6', label: 'Kapalı', val: stats.closed },
-                        ].map((st, i) => (
-                            <div key={st.id} className={`flex-1 min-w-[60px] p-1.5 md:p-2.5 text-center ${i !== 4 ? 'border-r border-[#DDE1E7]' : ''}`}>
-                                <div className="font-[Bebas_Neue] text-xl md:text-2xl leading-none" style={{ color: st.color }}>{st.val}</div>
-                                <div className="text-[7px] md:text-[8px] tracking-[1.5px] uppercase text-[#8892A0] mt-[1px] md:mt-[2px] truncate px-1">{st.label}</div>
-                            </div>
-                        ))}
-                    </div>
-
-                    <div className="absolute bottom-12 md:bottom-16 left-1/2 -translate-x-1/2 text-[7px] md:text-[8px] tracking-[1.5px] uppercase text-[#8892A0] bg-white/90 px-3 py-1 md:px-4 md:py-1.5 border border-[#DDE1E7] rounded-full whitespace-nowrap pointer-events-none z-10 shadow-sm opacity-80 backdrop-blur-sm">
+                    <div className="absolute bottom-3 left-1/2 -translate-x-1/2 text-[7px] md:text-[8px] tracking-[1.5px] uppercase text-[#8892A0] bg-white/90 px-3 py-1 md:px-4 md:py-1.5 border border-[#DDE1E7] rounded-full whitespace-nowrap pointer-events-none z-10 shadow-sm opacity-80 backdrop-blur-sm">
                         Tıkla: <span className="text-[#C8102E] font-bold">Detay</span> | Sürükle: Döndür
                     </div>
 
@@ -968,7 +946,7 @@ export default function PresentationViewer() {
                         </div>
                     </div>
                     <div className="p-2.5 md:p-3.5 border-b border-[#DDE1E7] flex gap-1.5 flex-wrap">
-                        {['all', 'available', 'sold', 'reserved', 'not_for_sale'].map(f => (
+                        {['all', 'available', 'reserved', 'not_for_sale'].map(f => (
                             <button
                                 key={f}
                                 className={`px-2 py-1 text-[8px] tracking-[1px] uppercase border rounded-full transition-colors ${listFilter === f ? 'border-[#C8102E] text-[#C8102E] bg-[#fdeef1]' : 'border-[#DDE1E7] text-[#8892A0] bg-transparent hover:border-[#C8102E] hover:text-[#C8102E] hover:bg-[#fdeef1]'}`}
