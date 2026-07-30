@@ -90,6 +90,10 @@ export interface Offer {
     offer_no: string;
     valid_until?: string;
     status: 'draft' | 'sent' | 'accepted' | 'rejected';
+    approval_status?: 'none' | 'pending' | 'approved' | 'rejected';
+    approved_by?: number | null;
+    approved_at?: string | null;
+    approver?: { id: number; name: string } | null;
     base_price: number;
     discount_amount: number;
     final_price: number;

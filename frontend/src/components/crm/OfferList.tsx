@@ -218,7 +218,18 @@ export function OfferList({ offers, projectName, onRowClick }: OfferListProps) {
             cell: ({ row }) => {
                 const status = row.getValue<string>('status');
                 const cfg = OFFER_STATUS_MAP[status] || { label: status, className: 'bg-slate-100 text-slate-600' };
-                return <Badge variant="outline" className={`text-xs ${cfg.className}`}>{cfg.label}</Badge>;
+                const approval = row.original.approval_status;
+                return (
+                    <div className="flex flex-col gap-1 items-start">
+                        <Badge variant="outline" className={`text-xs ${cfg.className}`}>{cfg.label}</Badge>
+                        {approval === 'pending' && (
+                            <Badge variant="outline" className="text-[10px] bg-amber-100 text-amber-700 border-amber-300">Onay Bekliyor</Badge>
+                        )}
+                        {approval === 'rejected' && (
+                            <Badge variant="outline" className="text-[10px] bg-red-100 text-red-600 border-red-300">İndirim Reddedildi</Badge>
+                        )}
+                    </div>
+                );
             },
             size: 130,
         },

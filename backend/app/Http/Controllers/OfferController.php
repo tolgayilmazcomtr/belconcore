@@ -11,9 +11,28 @@ use Barryvdh\DomPDF\Facade\Pdf;
 
 class OfferController extends Controller
 {
+    // Bu yüzdenin ÜZERİNDEKİ indirimler yönetici onayına düşer
+    private const DISCOUNT_APPROVAL_THRESHOLD = 5.0;
+
+    private function requiresApproval(float $base, float $discount): bool
+    {
+        if ($base <= 0 || $discount <= 0) {
+            return false;
+        }
+        return ($discount / $base) * 100 > self::DISCOUNT_APPROVAL_THRESHOLD;
+    }
+
+    private function managerOnly(Request $request): void
+    {
+        $user = $request->user();
+        if (!$user || (!$user->hasRole('Admin') && !$user->hasRole('Project Manager'))) {
+            abort(403, 'İndirim onayı için yönetici yetkisi gereklidir.');
+        }
+    }
+
     public function index(Request $request)
     {
-        $query = Offer::with(['customer', 'lead', 'unit.block', 'items.unit.block', 'creator']);
+        $query = Offer::with(['customer', 'lead', 'unit.block', 'items.unit.block', 'creator', 'approver']);
 
         if ($request->has('lead_id')) {
             $query->where('lead_id', $request->query('lead_id'));
@@ -52,12 +71,19 @@ class OfferController extends Controller
         $data['created_by'] = $request->user()->id;
         $data['offer_no']   = 'OFR-' . date('Y') . '-' . strtoupper(Str::random(6));
 
+        // %5 üzeri indirim sunucu tarafında yönetici onayına düşer
+        $data['approval_status'] = $this->requiresApproval(
+            (float) ($data['base_price'] ?? 0),
+            (float) ($data['discount_amount'] ?? 0)
+        ) ? 'pending' : 'none';
+
         // İlk birimi unit_id olarak tut (geriye dönük uyumluluk)
         $offerItems = $request->offer_items ?? [];
         if (!empty($offerItems)) {
             $data['unit_id'] = $offerItems[0]['unit_id'] ?? null;
         }
 
+        unset($data['offer_items']);
         $offer = Offer::create($data);
 
         // Offer items kaydet
@@ -125,9 +151,56 @@ class OfferController extends Controller
         }
 
         unset($data['offer_items']);
-        $offer->update($data);
-        $offer->load(['customer', 'lead', 'unit.block', 'items.unit.block', 'creator']);
 
+        // Fiyat/indirim değiştiyse onay durumunu yeniden hesapla
+        $newBase = array_key_exists('base_price', $data) ? (float) $data['base_price'] : (float) $offer->base_price;
+        $newDisc = array_key_exists('discount_amount', $data) ? (float) ($data['discount_amount'] ?? 0) : (float) $offer->discount_amount;
+        $priceChanged = $newBase !== (float) $offer->base_price || $newDisc !== (float) $offer->discount_amount;
+        if ($priceChanged) {
+            $data['approval_status'] = $this->requiresApproval($newBase, $newDisc) ? 'pending' : 'none';
+            $data['approved_by'] = null;
+            $data['approved_at'] = null;
+        }
+
+        $offer->update($data);
+        $offer->load(['customer', 'lead', 'unit.block', 'items.unit.block', 'creator', 'approver']);
+
+        return new OfferResource($offer);
+    }
+
+    public function approve(Request $request, Offer $offer)
+    {
+        $this->managerOnly($request);
+
+        if ($offer->approval_status !== 'pending') {
+            return response()->json(['message' => 'Bu teklif onay beklemiyor.'], 422);
+        }
+
+        $offer->update([
+            'approval_status' => 'approved',
+            'approved_by'     => $request->user()->id,
+            'approved_at'     => now(),
+        ]);
+
+        $offer->load(['customer', 'lead', 'unit.block', 'items.unit.block', 'creator', 'approver']);
+        return new OfferResource($offer);
+    }
+
+    public function reject(Request $request, Offer $offer)
+    {
+        $this->managerOnly($request);
+
+        if ($offer->approval_status !== 'pending') {
+            return response()->json(['message' => 'Bu teklif onay beklemiyor.'], 422);
+        }
+
+        $offer->update([
+            'approval_status' => 'rejected',
+            'approved_by'     => $request->user()->id,
+            'approved_at'     => now(),
+        ]);
+
+        $offer->load(['customer', 'lead', 'unit.block', 'items.unit.block', 'creator', 'approver']);
         return new OfferResource($offer);
     }
 
@@ -140,6 +213,14 @@ class OfferController extends Controller
         $user = $request->user();
         if (!$user->hasRole('Admin') && !$user->projects()->where('project_id', $offerModel->project_id)->exists()) {
             abort(403, 'Bu teklife erişim yetkiniz bulunmuyor.');
+        }
+
+        // Onay bekleyen/reddedilen indirimli teklifin PDF'i alınamaz
+        if ($offerModel->approval_status === 'pending') {
+            abort(403, 'Bu teklifteki indirim yönetici onayı bekliyor. Onaylanmadan PDF alınamaz.');
+        }
+        if ($offerModel->approval_status === 'rejected') {
+            abort(403, 'Bu teklifteki indirim yönetici tarafından reddedildi. Lütfen indirimi güncelleyin.');
         }
 
         $pdf = Pdf::loadView('pdf.offer_template', ['offer' => $offerModel])

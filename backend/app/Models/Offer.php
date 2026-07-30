@@ -17,6 +17,7 @@ class Offer extends Model
         'base_price' => 'decimal:2',
         'discount_amount' => 'decimal:2',
         'final_price' => 'decimal:2',
+        'approved_at' => 'datetime',
     ];
 
     protected static function booted()
@@ -52,5 +53,10 @@ class Offer extends Model
     public function creator()
     {
         return $this->belongsTo(User::class, 'created_by');
+    }
+
+    public function approver()
+    {
+        return $this->belongsTo(User::class, 'approved_by');
     }
 }

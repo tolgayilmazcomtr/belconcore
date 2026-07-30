@@ -30,6 +30,7 @@ import {
 import { OfferCreateModal } from './OfferCreateModal';
 import api from '@/lib/api';
 import { toast } from 'sonner';
+import { useAuthStore } from '@/store/useAuthStore';
 
 interface OfferDetailPanelProps {
     offer: Offer | null;
@@ -43,6 +44,12 @@ const OFFER_STATUS_MAP: Record<string, { label: string; icon: React.ReactNode; c
     sent: { label: 'Gönderildi', icon: <FileText className="w-4 h-4" />, className: 'bg-blue-100 text-blue-700 border-blue-300' },
     accepted: { label: 'Kabul Edildi', icon: <CheckCircle2 className="w-4 h-4" />, className: 'bg-emerald-100 text-emerald-700 border-emerald-300' },
     rejected: { label: 'Reddedildi', icon: <XCircle className="w-4 h-4" />, className: 'bg-red-100 text-red-600 border-red-300' },
+};
+
+const APPROVAL_MAP: Record<string, { label: string; icon: React.ReactNode; className: string }> = {
+    pending: { label: 'İndirim Onayı Bekliyor', icon: <Clock className="w-3.5 h-3.5" />, className: 'bg-amber-100 text-amber-700 border-amber-300' },
+    approved: { label: 'İndirim Onaylandı', icon: <CheckCircle2 className="w-3.5 h-3.5" />, className: 'bg-emerald-100 text-emerald-700 border-emerald-300' },
+    rejected: { label: 'İndirim Reddedildi', icon: <XCircle className="w-3.5 h-3.5" />, className: 'bg-red-100 text-red-600 border-red-300' },
 };
 
 const formatMoney = (amount?: number | null) => {
@@ -63,7 +70,29 @@ function InfoRow({ icon, label, value }: { icon: React.ReactNode; label: string;
 }
 
 export function OfferDetailPanel({ offer, open, onClose, onUpdated }: OfferDetailPanelProps) {
+    const user = useAuthStore(s => s.user);
+    const [approvalLoading, setApprovalLoading] = React.useState<'approve' | 'reject' | null>(null);
+
     if (!offer) return null;
+
+    const isManager = user?.roles?.some(r => r.name === 'Admin' || r.name === 'Project Manager') ?? false;
+    const approvalStatus = offer.approval_status ?? 'none';
+    const approvalCfg = APPROVAL_MAP[approvalStatus];
+
+    const handleApproval = async (action: 'approve' | 'reject') => {
+        setApprovalLoading(action);
+        try {
+            await api.post(`/offers/${offer.id}/${action}`);
+            toast.success(action === 'approve' ? 'İndirim onaylandı.' : 'İndirim reddedildi.');
+            onUpdated?.();
+            onClose();
+        } catch (e: unknown) {
+            const err = e as { response?: { data?: { message?: string } } };
+            toast.error(err.response?.data?.message ?? 'İşlem başarısız.');
+        } finally {
+            setApprovalLoading(null);
+        }
+    };
 
     const statusCfg = OFFER_STATUS_MAP[offer.status] || { label: offer.status, icon: null, className: 'bg-slate-100 text-slate-600' };
 
@@ -119,6 +148,12 @@ export function OfferDetailPanel({ offer, open, onClose, onUpdated }: OfferDetai
                                         {statusCfg.icon}
                                         {statusCfg.label}
                                     </Badge>
+                                    {approvalCfg && (
+                                        <Badge variant="outline" className={`flex items-center gap-1 text-xs ${approvalCfg.className}`}>
+                                            {approvalCfg.icon}
+                                            {approvalCfg.label}
+                                        </Badge>
+                                    )}
                                     {offer.created_at && (
                                         <span className="text-xs text-slate-400">
                                             {new Date(offer.created_at).toLocaleDateString('tr-TR')}
@@ -132,6 +167,62 @@ export function OfferDetailPanel({ offer, open, onClose, onUpdated }: OfferDetai
 
                 <div className="flex-1 overflow-y-auto min-h-0">
                     <div className="p-5 space-y-4">
+
+                        {/* İndirim Onayı Kartı */}
+                        {approvalStatus === 'pending' && (
+                            <div className="bg-amber-50 rounded-xl border border-amber-200 p-4">
+                                <h3 className="text-sm font-semibold text-amber-800 mb-1 flex items-center gap-2">
+                                    <Clock className="w-4 h-4" />
+                                    İndirim Onayı Bekliyor
+                                </h3>
+                                <p className="text-xs text-amber-700 mb-3">
+                                    Bu teklifte %5&apos;in üzerinde indirim var{discountPercent ? ` (%${discountPercent})` : ''}.
+                                    {isManager ? ' Onaylanana kadar PDF alınamaz.' : ' Yönetici onaylayana kadar PDF alınamaz.'}
+                                </p>
+                                {isManager && (
+                                    <div className="flex gap-2">
+                                        <Button
+                                            size="sm"
+                                            className="flex-1 bg-emerald-600 hover:bg-emerald-700 gap-1.5"
+                                            disabled={approvalLoading !== null}
+                                            onClick={() => handleApproval('approve')}
+                                        >
+                                            <CheckCircle2 className="w-4 h-4" />
+                                            {approvalLoading === 'approve' ? 'Onaylanıyor...' : 'İndirimi Onayla'}
+                                        </Button>
+                                        <Button
+                                            size="sm"
+                                            variant="outline"
+                                            className="flex-1 border-red-200 text-red-600 hover:bg-red-50 gap-1.5"
+                                            disabled={approvalLoading !== null}
+                                            onClick={() => handleApproval('reject')}
+                                        >
+                                            <XCircle className="w-4 h-4" />
+                                            {approvalLoading === 'reject' ? 'Reddediliyor...' : 'Reddet'}
+                                        </Button>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                        {approvalStatus === 'rejected' && (
+                            <div className="bg-red-50 rounded-xl border border-red-200 p-4">
+                                <h3 className="text-sm font-semibold text-red-700 mb-1 flex items-center gap-2">
+                                    <XCircle className="w-4 h-4" />
+                                    İndirim Reddedildi
+                                </h3>
+                                <p className="text-xs text-red-600">
+                                    {(offer.approver as { name?: string } | null)?.name ? `${(offer.approver as { name?: string }).name} tarafından reddedildi. ` : ''}
+                                    İndirimi güncelleyip tekrar kaydedin.
+                                </p>
+                            </div>
+                        )}
+                        {approvalStatus === 'approved' && (offer.approver as { name?: string } | null)?.name && (
+                            <div className="bg-emerald-50 rounded-xl border border-emerald-200 px-4 py-3 text-xs text-emerald-700 flex items-center gap-2">
+                                <CheckCircle2 className="w-4 h-4 shrink-0" />
+                                İndirim {(offer.approver as { name?: string }).name} tarafından onaylandı
+                                {offer.approved_at ? ` (${new Date(offer.approved_at).toLocaleDateString('tr-TR')})` : ''}.
+                            </div>
+                        )}
 
                         {/* Pricing Card */}
                         <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
@@ -245,6 +336,8 @@ export function OfferDetailPanel({ offer, open, onClose, onUpdated }: OfferDetai
                         variant="outline"
                         className="flex-1 gap-2 border-primary/30 text-primary hover:bg-primary/5"
                         onClick={handlePdf}
+                        disabled={approvalStatus === 'pending' || approvalStatus === 'rejected'}
+                        title={approvalStatus === 'pending' ? 'İndirim onaylanana kadar PDF alınamaz' : approvalStatus === 'rejected' ? 'İndirim reddedildi, güncelleme gerekli' : undefined}
                     >
                         <Download className="w-4 h-4" />
                         PDF İndir

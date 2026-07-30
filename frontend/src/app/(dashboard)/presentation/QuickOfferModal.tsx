@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
-import { X, Search, UserPlus, Loader2, FileDown, CheckCircle2, Calculator } from "lucide-react";
+import { X, Search, UserPlus, Loader2, FileDown, CheckCircle2, Calculator, Clock } from "lucide-react";
 import api from "@/lib/api";
 import { Customer } from "@/types/project.types";
 
@@ -50,14 +50,24 @@ export default function QuickOfferModal({ open, onClose, unit, projectId }: Prop
     // Fiyatlandırma
     const [basePrice, setBasePrice] = useState('');
     const [discount, setDiscount] = useState('0');
+    const [discountPct, setDiscountPct] = useState('0');
     const [finalPrice, setFinalPrice] = useState('');
     const [validUntil, setValidUntil] = useState('');
     const [notes, setNotes] = useState('');
 
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState('');
-    const [created, setCreated] = useState<{ id: number; offer_no: string } | null>(null);
+    const [created, setCreated] = useState<{ id: number; offer_no: string; approval_status: string } | null>(null);
     const [downloading, setDownloading] = useState(false);
+
+    // %5 üzeri indirim yönetici onayı gerektirir (sunucu tarafında da doğrulanır)
+    const APPROVAL_THRESHOLD = 5;
+    const currentPct = (() => {
+        const base = parseFloat(basePrice) || 0;
+        const disc = parseFloat(discount) || 0;
+        return base > 0 ? (disc / base) * 100 : 0;
+    })();
+    const needsApproval = currentPct > APPROVAL_THRESHOLD;
 
     // Modal açıldığında formu sıfırla
     useEffect(() => {
@@ -66,6 +76,7 @@ export default function QuickOfferModal({ open, onClose, unit, projectId }: Prop
         setShowNewCustomer(false); setNewCustomer({ first_name: '', last_name: '', phone: '' });
         setBasePrice(unit.list_price != null ? String(unit.list_price) : '');
         setDiscount('0');
+        setDiscountPct('0');
         setValidUntil(new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]);
         setNotes('');
         setError('');
@@ -124,9 +135,22 @@ export default function QuickOfferModal({ open, onClose, unit, projectId }: Prop
         }
     };
 
-    const applyDiscountPct = (pct: number) => {
+    // % ve ₺ alanlarını senkron tut
+    const pctFromAmount = (amount: number, base: number) =>
+        base > 0 ? String(parseFloat(((amount / base) * 100).toFixed(2))) : '0';
+
+    const onBaseChange = (v: string) => {
+        setBasePrice(v);
+        setDiscountPct(pctFromAmount(parseFloat(discount) || 0, parseFloat(v) || 0));
+    };
+    const onPctChange = (v: string) => {
+        setDiscountPct(v);
         const base = parseFloat(basePrice) || 0;
-        setDiscount(String(Math.round(base * pct / 100)));
+        setDiscount(String(Math.round(base * (parseFloat(v) || 0) / 100)));
+    };
+    const onAmountChange = (v: string) => {
+        setDiscount(v);
+        setDiscountPct(pctFromAmount(parseFloat(v) || 0, parseFloat(basePrice) || 0));
     };
 
     const submit = async () => {
@@ -158,7 +182,7 @@ export default function QuickOfferModal({ open, onClose, unit, projectId }: Prop
                 active_project_id: projectId,
             });
             const offer = res.data?.data || res.data;
-            setCreated({ id: offer.id, offer_no: offer.offer_no });
+            setCreated({ id: offer.id, offer_no: offer.offer_no, approval_status: offer.approval_status || 'none' });
         } catch (e) {
             const err = e as { response?: { data?: { message?: string } } };
             setError(err.response?.data?.message || 'Teklif kaydedilemedi.');
@@ -209,27 +233,47 @@ export default function QuickOfferModal({ open, onClose, unit, projectId }: Prop
                 {created ? (
                     /* ── Başarı ekranı ── */
                     <div className="p-6 flex flex-col items-center text-center gap-3">
-                        <CheckCircle2 size={44} className="text-emerald-500" />
-                        <div className="font-[Bebas_Neue] text-2xl tracking-[2px] text-[#1a1a2e]">Teklif Oluşturuldu</div>
-                        <div className="text-[12px] text-[#8892A0]">
-                            Teklif No: <span className="font-bold text-[#1a1a2e]">{created.offer_no}</span><br />
-                            {customerName(customer!)} · {fmtTL(parseFloat(finalPrice) || 0)}
-                        </div>
-                        {error && <div className="text-[11px] text-red-500">{error}</div>}
-                        <div className="flex gap-2 w-full mt-2">
-                            <button
-                                className="flex-1 bg-transparent text-[#8892A0] border border-[#DDE1E7] py-2.5 text-[10px] md:text-[11px] font-semibold tracking-[2px] uppercase rounded-[3px] hover:text-[#1a1a2e] transition-colors"
-                                onClick={onClose}
-                            >Kapat</button>
-                            <button
-                                className="flex-[1.5] bg-[#C8102E] hover:bg-[#E8294A] text-white py-2.5 text-[10px] md:text-[11px] font-bold tracking-[2px] uppercase rounded-[3px] transition-colors flex items-center justify-center gap-2 disabled:opacity-60"
-                                onClick={downloadPdf}
-                                disabled={downloading}
-                            >
-                                {downloading ? <Loader2 size={13} className="animate-spin" /> : <FileDown size={13} />}
-                                PDF İndir
-                            </button>
-                        </div>
+                        {created.approval_status === 'pending' ? (
+                            <>
+                                <Clock size={44} className="text-amber-500" />
+                                <div className="font-[Bebas_Neue] text-2xl tracking-[2px] text-[#1a1a2e]">Yönetici Onayına Gönderildi</div>
+                                <div className="text-[12px] text-[#8892A0]">
+                                    Teklif No: <span className="font-bold text-[#1a1a2e]">{created.offer_no}</span><br />
+                                    {customerName(customer!)} · {fmtTL(parseFloat(finalPrice) || 0)}
+                                </div>
+                                <div className="text-[10px] text-amber-600 bg-amber-50 border border-amber-200 rounded-[3px] px-3 py-2">
+                                    İndirim oranı onay gerektiriyor. Yönetici onayladığında teklif geçerli olur ve PDF alınabilir.
+                                </div>
+                                <button
+                                    className="w-full bg-transparent text-[#8892A0] border border-[#DDE1E7] py-2.5 text-[10px] md:text-[11px] font-semibold tracking-[2px] uppercase rounded-[3px] hover:text-[#1a1a2e] transition-colors mt-1"
+                                    onClick={onClose}
+                                >Kapat</button>
+                            </>
+                        ) : (
+                            <>
+                                <CheckCircle2 size={44} className="text-emerald-500" />
+                                <div className="font-[Bebas_Neue] text-2xl tracking-[2px] text-[#1a1a2e]">Teklif Oluşturuldu</div>
+                                <div className="text-[12px] text-[#8892A0]">
+                                    Teklif No: <span className="font-bold text-[#1a1a2e]">{created.offer_no}</span><br />
+                                    {customerName(customer!)} · {fmtTL(parseFloat(finalPrice) || 0)}
+                                </div>
+                                {error && <div className="text-[11px] text-red-500">{error}</div>}
+                                <div className="flex gap-2 w-full mt-2">
+                                    <button
+                                        className="flex-1 bg-transparent text-[#8892A0] border border-[#DDE1E7] py-2.5 text-[10px] md:text-[11px] font-semibold tracking-[2px] uppercase rounded-[3px] hover:text-[#1a1a2e] transition-colors"
+                                        onClick={onClose}
+                                    >Kapat</button>
+                                    <button
+                                        className="flex-[1.5] bg-[#C8102E] hover:bg-[#E8294A] text-white py-2.5 text-[10px] md:text-[11px] font-bold tracking-[2px] uppercase rounded-[3px] transition-colors flex items-center justify-center gap-2 disabled:opacity-60"
+                                        onClick={downloadPdf}
+                                        disabled={downloading}
+                                    >
+                                        {downloading ? <Loader2 size={13} className="animate-spin" /> : <FileDown size={13} />}
+                                        PDF İndir
+                                    </button>
+                                </div>
+                            </>
+                        )}
                     </div>
                 ) : (
                     <>
@@ -304,26 +348,29 @@ export default function QuickOfferModal({ open, onClose, unit, projectId }: Prop
                             </div>
 
                             {/* ── Fiyatlandırma ── */}
-                            <div className="grid grid-cols-2 gap-3">
+                            <div className="grid grid-cols-3 gap-3">
                                 <div>
                                     <label className={labelCls}>Liste Fiyatı (₺)</label>
                                     <input type="number" min="0" className={inputCls} value={basePrice}
-                                        onChange={e => setBasePrice(e.target.value)} />
+                                        onChange={e => onBaseChange(e.target.value)} />
+                                </div>
+                                <div>
+                                    <label className={labelCls}>İndirim (%)</label>
+                                    <input type="number" min="0" max="100" step="0.1" className={inputCls} value={discountPct}
+                                        onChange={e => onPctChange(e.target.value)} />
                                 </div>
                                 <div>
                                     <label className={labelCls}>İndirim (₺)</label>
                                     <input type="number" min="0" className={inputCls} value={discount}
-                                        onChange={e => setDiscount(e.target.value)} />
+                                        onChange={e => onAmountChange(e.target.value)} />
                                 </div>
                             </div>
-                            <div className="flex gap-1.5">
-                                {[1, 2, 3, 5].map(p => (
-                                    <button key={p}
-                                        className="px-2.5 py-1 text-[9px] font-bold tracking-[1px] border border-[#DDE1E7] rounded-full text-[#8892A0] hover:border-[#C8102E] hover:text-[#C8102E] hover:bg-[#fdeef1] transition-colors"
-                                        onClick={() => applyDiscountPct(p)}
-                                    >%{p} indirim</button>
-                                ))}
-                            </div>
+                            {needsApproval && (
+                                <div className="flex items-center gap-1.5 text-[10px] text-amber-600 bg-amber-50 border border-amber-200 rounded-[3px] px-2.5 py-1.5">
+                                    <Clock size={11} className="shrink-0" />
+                                    %{APPROVAL_THRESHOLD} üzeri indirim yönetici onayına gönderilir.
+                                </div>
+                            )}
 
                             {/* Net fiyat */}
                             <div className="bg-[#fdfaf3] border border-[#DDE1E7] rounded-[3px] px-4 py-3 flex items-center justify-between">

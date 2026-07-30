@@ -68,6 +68,8 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::apiResource('leads', LeadController::class);
         Route::apiResource('activities', ActivityController::class);
         
+        Route::post('offers/{offer}/approve', [OfferController::class, 'approve']);
+        Route::post('offers/{offer}/reject', [OfferController::class, 'reject']);
         Route::apiResource('offers', OfferController::class);
 
         // Muhasebe (Accounting)
