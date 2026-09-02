@@ -12,7 +12,7 @@ import {
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { Target, User, Building, MapPin, SearchCheck, AlignLeft, FileText, Download, Calendar, Pencil } from 'lucide-react';
+import { Target, User, Building, MapPin, SearchCheck, AlignLeft, FileText, Download, Calendar, Pencil, Phone, Mail } from 'lucide-react';
 import { useCrmStore } from '@/store/useCrmStore';
 import { OfferCreateModal } from '@/components/crm/OfferCreateModal';
 import { LeadCreateModal } from '@/components/crm/LeadCreateModal';
@@ -156,6 +156,30 @@ export function LeadDetailPanel({ lead, open, onClose }: LeadDetailPanelProps) {
                                                                 <p className="text-xs text-slate-500">Müşteri</p>
                                                             </div>
                                                         </div>
+
+                                                        {lead.customer?.phone && (
+                                                            <div className="flex items-start">
+                                                                <Phone className="w-5 h-5 text-emerald-500 mr-3 mt-0.5 shrink-0" />
+                                                                <div>
+                                                                    <a href={`tel:${lead.customer.phone}`} className="text-sm font-medium text-slate-800 hover:text-primary transition-colors">
+                                                                        {lead.customer.phone}
+                                                                    </a>
+                                                                    <p className="text-xs text-slate-500">Telefon</p>
+                                                                </div>
+                                                            </div>
+                                                        )}
+
+                                                        {lead.customer?.email && (
+                                                            <div className="flex items-start">
+                                                                <Mail className="w-5 h-5 text-blue-400 mr-3 mt-0.5 shrink-0" />
+                                                                <div>
+                                                                    <a href={`mailto:${lead.customer.email}`} className="text-sm font-medium text-slate-800 hover:text-primary transition-colors break-all">
+                                                                        {lead.customer.email}
+                                                                    </a>
+                                                                    <p className="text-xs text-slate-500">E-posta</p>
+                                                                </div>
+                                                            </div>
+                                                        )}
 
                                                         <div className="flex items-start">
                                                             <MapPin className="w-5 h-5 text-indigo-400 mr-3 mt-0.5 shrink-0" />
