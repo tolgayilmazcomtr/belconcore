@@ -64,6 +64,7 @@ Route::middleware('auth:sanctum')->group(function () {
         
         // CRM & Sales
         Route::apiResource('customers', CustomerController::class);
+        Route::post('leads/import', [LeadController::class, 'import']);
         Route::put('leads/{lead}/status', [LeadController::class, 'updateStatus']);
         Route::apiResource('leads', LeadController::class);
         Route::apiResource('activities', ActivityController::class);

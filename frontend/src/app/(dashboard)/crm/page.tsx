@@ -1,11 +1,12 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useProjectStore } from '@/store/useProjectStore';
 import { useCrmStore } from '@/store/useCrmStore';
 import api from '@/lib/api';
 import { LeadKanbanBoard } from '@/components/crm/LeadKanbanBoard';
 import { LeadCreateModal } from '@/components/crm/LeadCreateModal';
+import { LeadImportModal } from '@/components/crm/LeadImportModal';
 import { LeadDetailPanel } from '@/components/crm/LeadDetailPanel';
 import { Loader2, PieChart } from 'lucide-react';
 import { toast } from 'sonner';
@@ -16,29 +17,28 @@ export default function CRMPage() {
     const [isLoading, setIsLoading] = useState(false);
     const [isDetailOpen, setIsDetailOpen] = useState(false);
 
+    const fetchData = useCallback(async (showSpinner = true) => {
+        if (showSpinner) setIsLoading(true);
+        try {
+            // Fetch Leads and Customers
+            const [leadsRes, customersRes] = await Promise.all([
+                api.get('/leads'),
+                api.get('/customers')
+            ]);
+            setLeads(leadsRes.data.data || []);
+            setCustomers(customersRes.data.data || []);
+        } catch (error) {
+            console.error("Veriler alınamadı", error);
+            toast.error("CRM verileri yüklenirken bir sorun oluştu.");
+        } finally {
+            if (showSpinner) setIsLoading(false);
+        }
+    }, [setLeads, setCustomers]);
+
     useEffect(() => {
         if (!activeProject) return;
-
-        const fetchData = async () => {
-            setIsLoading(true);
-            try {
-                // Fetch Leads and Customers
-                const [leadsRes, customersRes] = await Promise.all([
-                    api.get('/leads'),
-                    api.get('/customers')
-                ]);
-                setLeads(leadsRes.data.data || []);
-                setCustomers(customersRes.data.data || []);
-            } catch (error) {
-                console.error("Veriler alınamadı", error);
-                toast.error("CRM verileri yüklenirken bir sorun oluştu.");
-            } finally {
-                setIsLoading(false);
-            }
-        };
-
         fetchData();
-    }, [activeProject, setLeads, setCustomers]);
+    }, [activeProject, fetchData]);
 
     if (!activeProject) {
         return (
@@ -62,6 +62,7 @@ export default function CRMPage() {
                     <p className="text-sm text-slate-500 mt-1">Müşteri potansiyellerini aşamalara göre sürükleyip bırakarak yönetin.</p>
                 </div>
                 <div className="flex items-center space-x-3">
+                    <LeadImportModal onSuccess={() => fetchData(false)} />
                     <LeadCreateModal />
                 </div>
             </div>
